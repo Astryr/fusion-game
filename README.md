@@ -81,13 +81,13 @@ ProjectSettings/     Configuracion del proyecto (Force Text para poder versionar
 
 ## Sobre el repositorio
 
-Este proyecto se generó dentro de un repo temporal de Cursor. Para que
-quede guardado bajo tu cuenta/organización de GitHub (por ejemplo tu
-usuario u organización **Astryr**, junto a tus otros proyectos de juegos,
-y no en un repo institucional), usá la opción para crear/conectar el
-repositorio de GitHub definitivo desde la interfaz de Cursor y elegí ahí el
-destino correcto. Una vez creado, todo el historial de commits de este
-scaffold queda disponible ahí.
+Este proyecto todavía no tiene un repositorio de GitHub propio vinculado.
+Para dejarlo guardado en GitHub, usá la opción **"Create repo"** en la
+interfaz de Cursor: ahí vas a poder elegir vos mismo el destino (por
+ejemplo, tu cuenta/organización de juegos **Astryr**, junto a tus otros
+proyectos, en vez de una cuenta u organización institucional de la
+facultad). Todo el historial de commits de este scaffold se conserva una
+vez que quede creado el repositorio.
 
 ## Control de versiones
 
