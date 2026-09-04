@@ -81,16 +81,13 @@ ProjectSettings/     Configuracion del proyecto (Force Text para poder versionar
 
 ## Sobre el repositorio
 
-El código vive en **Origin**, la plataforma de repositorios de Cursor
-(no es GitHub, es un servicio propio con su interfaz web y su propio CLI):
+El código vive en GitHub: **<https://github.com/Astryr/fusion-game>**
+(repositorio privado). Para invitar compañeros de equipo, sumalos como
+colaboradores desde **Settings → Collaborators** en esa página.
 
-- Ver el repo en el navegador: <https://cursor.com/codebase/santino-jorge/fusion-game>
-- Visibilidad actual: **Privado**. Se puede cambiar desde esa misma página
-  (Settings del repo), por ejemplo para invitar a compañeros de equipo como
-  colaboradores.
-- Para clonarlo en una máquina, ver [`SETUP.md`](./SETUP.md) → sección
-  "Clonar el repositorio", que tiene los pasos según sistema operativo
-  (Windows necesita WSL, ya que el CLI de Origin no corre en PowerShell).
+Para clonarlo, la forma más simple es con
+[GitHub Desktop](https://desktop.github.com/) (sin usar la terminal) — ver
+el detalle en [`SETUP.md`](./SETUP.md) → sección "Clonar el repositorio".
 
 ## Control de versiones
 

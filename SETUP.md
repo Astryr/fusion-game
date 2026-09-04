@@ -33,60 +33,32 @@ Al final hay una sección de **pruebas con varias personas** y otra de
 
 ### A.2. Clonar el repositorio y abrir el proyecto
 
-El código vive en **Origin** (la plataforma de repos de Cursor):
-<https://cursor.com/codebase/santino-jorge/fusion-game> (repo privado; para
-sumar compañeros como colaboradores, entrar a Settings desde esa página).
+El código vive en GitHub: **<https://github.com/Astryr/fusion-game>**
+(repositorio privado). La forma más simple de bajarlo, sin usar la terminal,
+es con **GitHub Desktop**:
 
-Para clonarlo se usa el **Origin CLI**, que funciona en macOS, Linux y WSL
-(no corre directo en PowerShell/CMD de Windows).
+1. Instalá [GitHub Desktop](https://desktop.github.com/) e iniciá sesión con
+   la cuenta de GitHub que tiene acceso al repo (la cuenta **Astryr**, o la
+   que hayan sumado como colaboradora).
+2. **File → Clone repository**, pestaña "GitHub.com", buscá **`fusion-game`**
+   en la lista y seleccionalo.
+3. En **Local path**, elegí la carpeta de proyectos donde ya tenés tus otros
+   juegos (por ejemplo `C:\Users\Urano\Proyectos`) — GitHub Desktop va a
+   crear ahí la subcarpeta `fusion-game`.
+4. **Clone**.
 
-**Si tu máquina es Windows:**
+Alternativa por terminal, para quien prefiera usarla (Windows, macOS o
+Linux, con [Git](https://git-scm.com/) instalado):
 
-1. Si todavía no tenés WSL instalado, abrí PowerShell **como administrador**
-   y corré `wsl --install`, reiniciá cuando te lo pida, y creá tu usuario de
-   Linux la primera vez que abra la terminal de WSL.
-2. Abrí una terminal de **WSL (Ubuntu)** y corré:
+```bash
+git clone https://github.com/Astryr/fusion-game.git
+```
 
-   ```bash
-   # Instalar el Origin CLI
-   curl -fsSL https://downloads.cursor.com/origin/install.sh | sh
-
-   # Iniciar sesion (tambien configura las credenciales de git)
-   origin auth login
-   ```
-
-3. **Importante para que Unity (que corre nativo en Windows) pueda abrir el
-   proyecto sin problemas de rendimiento**: cloná dentro de tu carpeta de
-   proyectos de Windows, accediendo a ella vía `/mnt/c/...` desde WSL, en
-   vez de clonar dentro del home de Linux. Por ejemplo, si tus otros juegos
-   están en `C:\Users\Urano\Proyectos`:
-
-   ```bash
-   cd "/mnt/c/Users/Urano/Proyectos"
-   origin repo clone santino-jorge/fusion-game
-   ```
-
-   Esto va a dejar la carpeta en `C:\Users\Urano\Proyectos\fusion-game`,
-   como una carpeta de Windows común, junto a tus otros proyectos.
-
-   Si después de instalar `origin` la terminal dice `command not found`,
-   corré esto una vez y abrí una terminal nueva:
-
-   ```bash
-   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-   source ~/.bashrc
-   ```
-
-   Documentación completa del CLI: <https://cursor.com/docs/origin/cli>
-
-**Si tu máquina es macOS o Linux:** los mismos comandos de arriba
-(`curl ... | sh`, `origin auth login`, `origin repo clone
-santino-jorge/fusion-game`) funcionan directo en la terminal normal, sin
-necesidad de WSL.
-
-**Para el resto del equipo:** cada persona necesita que se la sume como
-colaboradora del repo (Settings en la página de Origin) y su propia cuenta
-para poder hacer `origin auth login`.
+**Para sumar compañeros de equipo:** desde
+<https://github.com/Astryr/fusion-game> → **Settings → Collaborators →
+Add people**, invitalos con su usuario o email de GitHub. Una vez que
+acepten la invitación, pueden clonar con cualquiera de los dos métodos de
+arriba.
 
 Una vez clonado:
 
@@ -173,12 +145,18 @@ Si funcionó, ¡vas al último paso!
 
 ### A.8. Commitear y subir todo
 
+Con la terminal:
+
 ```bash
-git add Assets/Photon Assets/_Project/Resources/Player.prefab* 
 git add -A
 git commit -m "Importar Photon Fusion 2 SDK y crear prefab del jugador"
 git push
 ```
+
+O si preferís no usar la terminal, desde **GitHub Desktop**: va a listar
+todos los archivos nuevos (los de `Assets/Photon` y el prefab del jugador)
+en la pestaña "Changes", escribís un resumen abajo a la izquierda,
+**Commit to main**, y arriba a la derecha **Push origin**.
 
 A partir de acá, nadie más del equipo necesita repetir los pasos A.3 a A.6:
 ya está todo en el repo.
@@ -189,20 +167,21 @@ ya está todo en el repo.
 > repositorio**. No es una clave ultra sensible (no da acceso a datos, como
 > mucho alguien podría gastar cuota gratuita de tu cuenta de Photon si el
 > repo fuera público), pero el repositorio ya está en modo **privado** en
-> Origin, así que no hay problema.
+> GitHub, así que no hay problema.
 
 ---
 
 ## B. Para el resto del equipo (después del paso A)
 
-1. Pedí que te sumen como colaborador/a del repositorio (desde la página
-   del repo en Origin: <https://cursor.com/codebase/santino-jorge/fusion-game>
-   → Settings).
+1. Pedí que te sumen como colaborador/a del repositorio (desde
+   <https://github.com/Astryr/fusion-game> → Settings → Collaborators).
+   Vas a recibir una invitación por email o notificación de GitHub que hay
+   que aceptar.
 2. Instalá **Unity 6000.3.23f1** (o la versión que haya quedado configurada
    en `ProjectSettings/ProjectVersion.txt`) desde Unity Hub.
-3. Cloná el repositorio siguiendo la sección **A.2** de arriba (ya con
-   `Assets/Photon` y el prefab del jugador incluidos, una vez que se haya
-   completado el paso A).
+3. Cloná el repositorio siguiendo la sección **A.2** de arriba (con GitHub
+   Desktop es lo más simple) — ya va a incluir `Assets/Photon` y el prefab
+   del jugador, una vez que se haya completado el paso A.
 4. Abrí el proyecto desde Unity Hub.
 5. Esperá a que termine de importar. No debería haber errores de
    compilación ni pasos adicionales.
