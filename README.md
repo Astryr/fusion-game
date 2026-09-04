@@ -57,27 +57,30 @@ con **Photon Fusion 2** como capa de networking.
 
 ```
 Assets/
-  _Project/
-    Scenes/
-      MainMenu.unity     Pantalla inicial: crear/unirse a una sala
-      Game.unity          Escena de juego (donde se spawnean los jugadores)
-    Scripts/
-      Core/
-        NetworkInputData.cs      Estructura de input que viaja por red
-        NetworkRunnerHandler.cs  Conexion, spawn de jugadores, callbacks de Fusion
-      Player/
-        PlayerController.cs      Movimiento en red + color placeholder
-      UI/
-        UIFactory.cs             Helpers para armar UI por codigo
-        MainMenuController.cs    Pantalla de conexion
-        GameHUDController.cs     HUD dentro de la partida
-    Resources/
-      Player.prefab (se crea en la configuracion inicial, ver SETUP.md)
-  Photon/            Se crea al importar el SDK de Fusion (no versionado todavia)
+  Scenes/
+    MainMenu.unity     Pantalla inicial: crear/unirse a una sala
+    Game.unity          Escena de juego (donde se spawnean los jugadores)
+  Scripts/
+    Core/
+      NetworkInputData.cs      Estructura de input que viaja por red
+      NetworkRunnerHandler.cs  Conexion, spawn de jugadores, callbacks de Fusion
+    Player/
+      PlayerController.cs      Movimiento en red + color placeholder
+    UI/
+      UIFactory.cs             Helpers para armar UI por codigo
+      MainMenuController.cs    Pantalla de conexion
+      GameHUDController.cs     HUD dentro de la partida
+  Resources/
+    Player.prefab      Prefab del jugador (ver SETUP.md)
+  Photon/               SDK de Photon Fusion 2 (importado, ver SETUP.md)
 Packages/
   manifest.json      Dependencias del proyecto (paquetes 2D/UI de Unity)
 ProjectSettings/     Configuracion del proyecto (Force Text para poder versionar en git)
 ```
+
+> Nota: las carpetas van directo bajo `Assets/` (sin carpeta envoltorio tipo
+> `_Project`), organizadas por dominio (`Scripts/Player`, `Scripts/UI`, etc.),
+> siguiendo el mismo orden que usamos en otros proyectos del equipo.
 
 ## Sobre el repositorio
 

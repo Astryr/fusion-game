@@ -119,9 +119,9 @@ instalado, por eso este es el único paso manual dentro del editor):
      componente de Fusion).
    - **Network Transform** (buscalo escribiendo "Network Transform"; sincroniza
      posición/rotación por red).
-   - **Player Controller** (nuestro script, en `Assets/_Project/Scripts/Player`).
+   - **Player Controller** (nuestro script, en `Assets/Scripts/Player`).
 3. Arrastrá el objeto `Player` desde la Hierarchy hacia la carpeta
-   **`Assets/_Project/Resources/`** en la ventana Project. Esto lo
+   **`Assets/Resources/`** en la ventana Project. Esto lo
    convierte en un prefab (Unity te va a preguntar "Original Prefab" —
    elegí esa opción).
 4. Borrá la instancia `Player` que quedó en la Hierarchy (ya está guardada
@@ -135,7 +135,7 @@ instalado, por eso este es el único paso manual dentro del editor):
 
 ### A.7. Probar la conexión
 
-1. Abrí la escena `Assets/_Project/Scenes/MainMenu.unity`.
+1. Abrí la escena `Assets/Scenes/MainMenu.unity`.
 2. Dale **Play**.
 3. Escribí un nombre de sala (por ejemplo `Sala1`) y tocá **Conectar**.
 4. Deberías pasar a la escena `Game` y ver tu cuadrado de color moverse con
@@ -185,7 +185,7 @@ ya está todo en el repo.
 4. Abrí el proyecto desde Unity Hub.
 5. Esperá a que termine de importar. No debería haber errores de
    compilación ni pasos adicionales.
-6. Abrí `Assets/_Project/Scenes/MainMenu.unity`, dale Play, escribí el
+6. Abrí `Assets/Scenes/MainMenu.unity`, dale Play, escribí el
    mismo nombre de sala que use el resto del equipo y conectate.
 
 ---

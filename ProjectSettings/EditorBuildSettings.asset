@@ -6,10 +6,10 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/_Project/Scenes/MainMenu.unity
+    path: Assets/Scenes/MainMenu.unity
     guid: e377bc8fe89c43eb995655a64c0c86c1
   - enabled: 1
-    path: Assets/_Project/Scenes/Game.unity
+    path: Assets/Scenes/Game.unity
     guid: afab7f35a99b47128854ce6158795182
   - enabled: 1
     path: Assets/Photon/FusionDemos/Fusion-Intro-Shared/Scenes/FusionIntroShared.unity
