@@ -1,0 +1,60 @@
+# Este .gitignore esta basado en la plantilla oficial de Unity para proyectos con Git.
+# https://github.com/github/gitignore/blob/main/Unity.gitignore
+
+# Carpetas generadas por el Editor (se recrean solas al abrir el proyecto)
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Paquetes descargados de forma local (si se usan) y cache de Package Manager
+/[Aa]ssets/[Aa]ssetStoreTools*
+/Packages/com.unity.*.tgz
+
+# Los .meta solo deben ignorarse si el asset correspondiente tambien esta ignorado
+!/[Aa]ssets/**/*.meta
+
+# Archivos autogenerados por IDEs (Rider / VS / VS Code)
+.vs/
+.vscode/
+.idea/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+ExportedObj/
+.consulo/
+
+# Archivos generados por builds o crashes
+*.apk
+*.aab
+*.unitypackage
+*.app
+sysinfo.txt
+crashlytics-build.properties
+
+# Addressables empaquetados
+/[Aa]ssets/[Aa]ddressableAssetsData/*/*.bin*
+
+# Assets de StreamingAssets autogenerados para Android
+/[Aa]ssets/[Ss]treamingAssets/aa.meta
+/[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
