@@ -81,13 +81,16 @@ ProjectSettings/     Configuracion del proyecto (Force Text para poder versionar
 
 ## Sobre el repositorio
 
-Este proyecto todavía no tiene un repositorio de GitHub propio vinculado.
-Para dejarlo guardado en GitHub, usá la opción **"Create repo"** en la
-interfaz de Cursor: ahí vas a poder elegir vos mismo el destino (por
-ejemplo, tu cuenta/organización de juegos **Astryr**, junto a tus otros
-proyectos, en vez de una cuenta u organización institucional de la
-facultad). Todo el historial de commits de este scaffold se conserva una
-vez que quede creado el repositorio.
+El código vive en **Origin**, la plataforma de repositorios de Cursor
+(no es GitHub, es un servicio propio con su interfaz web y su propio CLI):
+
+- Ver el repo en el navegador: <https://cursor.com/codebase/santino-jorge/fusion-game>
+- Visibilidad actual: **Privado**. Se puede cambiar desde esa misma página
+  (Settings del repo), por ejemplo para invitar a compañeros de equipo como
+  colaboradores.
+- Para clonarlo en una máquina, ver [`SETUP.md`](./SETUP.md) → sección
+  "Clonar el repositorio", que tiene los pasos según sistema operativo
+  (Windows necesita WSL, ya que el CLI de Origin no corre en PowerShell).
 
 ## Control de versiones
 

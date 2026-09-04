@@ -33,11 +33,67 @@ Al final hay una sección de **pruebas con varias personas** y otra de
 
 ### A.2. Clonar el repositorio y abrir el proyecto
 
-1. Cloná el repositorio en tu máquina.
-2. Abrí **Unity Hub > Open > Add project from disk** y seleccioná la
+El código vive en **Origin** (la plataforma de repos de Cursor):
+<https://cursor.com/codebase/santino-jorge/fusion-game> (repo privado; para
+sumar compañeros como colaboradores, entrar a Settings desde esa página).
+
+Para clonarlo se usa el **Origin CLI**, que funciona en macOS, Linux y WSL
+(no corre directo en PowerShell/CMD de Windows).
+
+**Si tu máquina es Windows:**
+
+1. Si todavía no tenés WSL instalado, abrí PowerShell **como administrador**
+   y corré `wsl --install`, reiniciá cuando te lo pida, y creá tu usuario de
+   Linux la primera vez que abra la terminal de WSL.
+2. Abrí una terminal de **WSL (Ubuntu)** y corré:
+
+   ```bash
+   # Instalar el Origin CLI
+   curl -fsSL https://downloads.cursor.com/origin/install.sh | sh
+
+   # Iniciar sesion (tambien configura las credenciales de git)
+   origin auth login
+   ```
+
+3. **Importante para que Unity (que corre nativo en Windows) pueda abrir el
+   proyecto sin problemas de rendimiento**: cloná dentro de tu carpeta de
+   proyectos de Windows, accediendo a ella vía `/mnt/c/...` desde WSL, en
+   vez de clonar dentro del home de Linux. Por ejemplo, si tus otros juegos
+   están en `C:\Users\Urano\Proyectos`:
+
+   ```bash
+   cd "/mnt/c/Users/Urano/Proyectos"
+   origin repo clone santino-jorge/fusion-game
+   ```
+
+   Esto va a dejar la carpeta en `C:\Users\Urano\Proyectos\fusion-game`,
+   como una carpeta de Windows común, junto a tus otros proyectos.
+
+   Si después de instalar `origin` la terminal dice `command not found`,
+   corré esto una vez y abrí una terminal nueva:
+
+   ```bash
+   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+
+   Documentación completa del CLI: <https://cursor.com/docs/origin/cli>
+
+**Si tu máquina es macOS o Linux:** los mismos comandos de arriba
+(`curl ... | sh`, `origin auth login`, `origin repo clone
+santino-jorge/fusion-game`) funcionan directo en la terminal normal, sin
+necesidad de WSL.
+
+**Para el resto del equipo:** cada persona necesita que se la sume como
+colaboradora del repo (Settings en la página de Origin) y su propia cuenta
+para poder hacer `origin auth login`.
+
+Una vez clonado:
+
+1. Abrí **Unity Hub > Open > Add project from disk** y seleccioná la
    carpeta clonada (la raíz del repo, donde están `Assets/`, `Packages/`
    y `ProjectSettings/`).
-3. Abrí el proyecto. La primera vez Unity va a importar todo (puede tardar
+2. Abrí el proyecto. La primera vez Unity va a importar todo (puede tardar
    varios minutos) y va a mostrar errores de compilación esperables del
    tipo `The type or namespace name 'Fusion' could not be found` — es
    normal, todavía no importamos el SDK. Seguí al siguiente paso.
@@ -132,21 +188,25 @@ ya está todo en el repo.
 > `Assets/Photon/Fusion/Resources/PhotonAppSettings.asset` **dentro del
 > repositorio**. No es una clave ultra sensible (no da acceso a datos, como
 > mucho alguien podría gastar cuota gratuita de tu cuenta de Photon si el
-> repo fuera público), pero si prefieren mantenerlo privado, dejen el
-> repositorio en modo privado en GitHub.
+> repo fuera público), pero el repositorio ya está en modo **privado** en
+> Origin, así que no hay problema.
 
 ---
 
 ## B. Para el resto del equipo (después del paso A)
 
-1. Instalá **Unity 6000.3.23f1** (o la versión que haya quedado configurada
+1. Pedí que te sumen como colaborador/a del repositorio (desde la página
+   del repo en Origin: <https://cursor.com/codebase/santino-jorge/fusion-game>
+   → Settings).
+2. Instalá **Unity 6000.3.23f1** (o la versión que haya quedado configurada
    en `ProjectSettings/ProjectVersion.txt`) desde Unity Hub.
-2. Cloná el repositorio (ya con `Assets/Photon` y el prefab del jugador
-   incluidos).
-3. Abrí el proyecto desde Unity Hub.
-4. Esperá a que termine de importar. No debería haber errores de
+3. Cloná el repositorio siguiendo la sección **A.2** de arriba (ya con
+   `Assets/Photon` y el prefab del jugador incluidos, una vez que se haya
+   completado el paso A).
+4. Abrí el proyecto desde Unity Hub.
+5. Esperá a que termine de importar. No debería haber errores de
    compilación ni pasos adicionales.
-5. Abrí `Assets/_Project/Scenes/MainMenu.unity`, dale Play, escribí el
+6. Abrí `Assets/_Project/Scenes/MainMenu.unity`, dale Play, escribí el
    mismo nombre de sala que use el resto del equipo y conectate.
 
 ---
