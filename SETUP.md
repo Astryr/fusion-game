@@ -250,6 +250,42 @@ configuren migración de host).
 
 ---
 
+## E. Trabajar con Cursor en modo local (commits directos, sin PRs)
+
+Cuando pedís cambios en el **chat de Cursor Cloud** (el que corre en la nube),
+esos cambios siempre llegan como Pull Request: es una restricción de esa
+plataforma, no algo configurable. Si preferís el flujo directo a `main` sin
+PRs — como se trabaja en `seminario-martes` —, hacelo con **Cursor local**,
+instalado en tu propia máquina:
+
+1. Instalá [Cursor](https://cursor.com/) (el editor) y abrí sesión con tu
+   cuenta.
+2. **File → Open Folder** y seleccioná la carpeta raíz de tu clon del repo
+   (donde están `Assets/`, `Packages/` y `ProjectSettings/`; ver sección A.2
+   si todavía no lo clonaste).
+3. Antes de arrancar, asegurate de estar al día:
+   ```bash
+   git checkout main
+   git pull origin main
+   ```
+4. Abrí el panel de chat/Agent de Cursor (ícono en la barra lateral o
+   `Ctrl+L` / `Ctrl+I`) y pedí los cambios como charlando. Al correr local,
+   el agente edita los archivos del repo clonado en tu disco y —si le pedís
+   que commitee— corre `git add` / `git commit` / `git push` directo sobre la
+   rama que tengas activa (`main` por defecto), sin crear ramas ni PRs.
+5. (Opcional, para que no te pida confirmar cada comando de terminal) En
+   **Cursor Settings → Chat/Agent** buscá la opción de auto-ejecutar
+   comandos ("Auto-run"/"Yolo mode") y habilitala si querés que ande más
+   fluido, igual de autónomo que el agente cloud.
+6. Este repo ya tiene un archivo `.cursor/rules/working-style.mdc` con las
+   convenciones del equipo (idioma, estructura de carpetas, estilo de
+   commits). Cursor lo lee solo apenas abrís el proyecto, así que no hace
+   falta reexplicarle el estilo de trabajo en cada sesión nueva.
+
+> Ojo: si varios compañeros pushean directo a `main` al mismo tiempo, pueden
+> pisarse cambios. Hacer `git pull origin main` seguido (sobre todo antes de
+> empezar a laburar) ayuda a evitar sorpresas.
+
 ## Próximos pasos sugeridos (según el temario de la materia)
 
 - **JR6 (Sincronización e interacción)**: agregar más propiedades
