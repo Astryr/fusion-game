@@ -52,6 +52,12 @@ con **Photon Fusion 2** como capa de networking.
    AppID de Photon), seguí la sección **"Primera configuración"**.
 3. Si un compañero ya hizo el paso anterior y lo subió al repo, con seguir
    la sección **"Para el resto del equipo"** alcanza.
+4. Si vas a usar **Cursor** (IDE con IA) en tu máquina para laburar directo
+   sobre `main` sin Pull Requests, ver `SETUP.md` → sección **"E. Trabajar
+   con Cursor en modo local"**. Las convenciones del equipo (estructura de
+   carpetas, estilo de commits, etc.) ya están en
+   [`.cursor/rules/working-style.mdc`](./.cursor/rules/working-style.mdc),
+   así que Cursor las lee solo al abrir el proyecto.
 
 ## Estructura del proyecto
 

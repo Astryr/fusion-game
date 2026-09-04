@@ -1,0 +1,58 @@
+---
+description: Estilo de trabajo del equipo (idioma, convenciones de codigo/carpetas y flujo de git), alineado con seminario-martes
+alwaysApply: true
+---
+
+# Como trabajamos en este repo
+
+Estas reglas resumen la forma de trabajar acordada con el equipo (mismo
+criterio que se usa en el repo hermano `seminario-martes`). Valen tanto para
+Cursor local como para agentes cloud.
+
+## Comunicacion
+
+- Responder en español, con voseo, directo y sin relleno.
+- Avanzar y resolver de forma autonoma en vez de preguntar en cada paso.
+  Frenar a preguntar solo si algo es realmente ambiguo o riesgoso (borrar
+  algo importante, decision de diseño que cambia el juego, etc).
+- No inventar mecanicas/features que no se pidieron explicitamente.
+
+## Estructura de carpetas (Assets)
+
+- Nada de carpetas envoltorio tipo `_Project/`: todo va directo bajo
+  `Assets/` (`Assets/Scripts/`, `Assets/Scenes/`, `Assets/Resources/`, etc.),
+  igual que en `seminario-martes`.
+- Organizar `Scripts/` por dominio/feature (`Scripts/Player/`,
+  `Scripts/UI/`, `Scripts/Enemies/`, `Scripts/Core/`, etc.), con
+  subcarpetas cuando un dominio crece (ej. `Player/Attack/`, `Player/Dash/`).
+- Las carpetas de terceros (SDKs importados como `Assets/Photon/`) se dejan
+  como las genera su propio instalador; no se reorganizan.
+
+## Codigo
+
+- Nombres de clases/metodos/variables en ingles, aunque hablemos en español.
+- Comentarios solo cuando algo no es obvio (por que, no que). Nada de
+  comentarios que solo narran la linea de abajo.
+- Mover archivos de Unity siempre con `git mv` (o moviendo el `.meta` junto
+  con el asset) para no romper GUIDs/referencias.
+
+## Commits
+
+- Commits chicos, uno por cambio logico, con mensaje corto y concreto
+  describiendo que se hizo (estilo `Fix rat chase stalling and add stuck
+  escape`, no "conventional commits" con prefijos tipo `feat:`/`fix:`).
+- Actualizar README.md / SETUP.md cuando el cambio afecta como se instala,
+  configura o entiende el proyecto.
+
+## Flujo de git — ojo, depende de donde corre el agente
+
+- **Cursor local** (repo clonado en tu maquina, editor abierto ahi): commitear
+  y pushear directo a la rama activa (normalmente `main`), sin crear ramas
+  nuevas ni abrir Pull Requests, salvo que se pida lo contrario. Antes de
+  arrancar cada sesion, hacer `git pull origin main` para evitar conflictos
+  con lo que subieron otros compañeros.
+- **Agente cloud** (Cursor Cloud Agents / background agents): por
+  restriccion de la plataforma, SIEMPRE trabaja en una rama `cursor/...` y
+  abre un Pull Request — no puede pushear directo a `main` ni mergear el PR
+  el mismo. Para no acumular ramas de mas, reutiliza la misma rama/PR mientras
+  dure la conversacion en vez de crear una nueva por cada pedido chico.
