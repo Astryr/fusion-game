@@ -56,6 +56,10 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
     private NetworkObject _gameManagerPrefab;
     private bool _gameManagerSpawnRequested;
 
+    // Fusion no llama OnInput en el mismo ritmo que Update: si leemos
+    // GetKeyDown ahi, el toque de ESPACIO se puede perder entre ticks.
+    private bool _jumpQueued;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -66,6 +70,14 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
+    }
+
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            _jumpQueued = true;
+        }
     }
 
     /// <summary>
@@ -235,10 +247,11 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) horizontal -= 1f;
         if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) horizontal += 1f;
 
-        bool jumpPressed = Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow);
-
+        // Salto: solo ESPACIO (nada de W ni flecha arriba). El buffer se
+        // consume aca para no perder el toque si Fusion poll-ea en otro frame.
         data.Horizontal = horizontal;
-        data.JumpPressed = jumpPressed;
+        data.JumpPressed = _jumpQueued;
+        _jumpQueued = false;
         input.Set(data);
     }
 

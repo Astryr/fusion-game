@@ -20,6 +20,9 @@ TextureImporter:
   - first:
       213: -4743906097335544613
     second: Moniko_Walk_5
+  - first:
+      213: 2102638385
+    second: Moniko_Walk_6
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -118,19 +121,19 @@ TextureImporter:
       name: Moniko_Walk_0
       rect:
         serializedVersion: 2
-        x: 2
-        y: 6
-        width: 58
-        height: 48
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+        x: 0
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: b833344923572194cb0d6aad187614f7
+      spriteID: a5ddf25c9d153a04f9857b5dd5e7f0b5
       internalID: -6774684017472134546
       vertices: []
       indices: 
@@ -140,19 +143,19 @@ TextureImporter:
       name: Moniko_Walk_1
       rect:
         serializedVersion: 2
-        x: 66
-        y: 6
-        width: 58
-        height: 48
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+        x: 64
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 4457e58e93cc98f4f9f1b08b9a2a2fa8
+      spriteID: 40493e3efd609e840b97926479739778
       internalID: -4606118228267618184
       vertices: []
       indices: 
@@ -162,19 +165,19 @@ TextureImporter:
       name: Moniko_Walk_2
       rect:
         serializedVersion: 2
-        x: 130
-        y: 6
-        width: 58
-        height: 48
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+        x: 128
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: e863c7c93f85a4b4dac973d383e0a8cb
+      spriteID: e920cb18e77547f4eb705c01acfc3892
       internalID: 3133168173931226065
       vertices: []
       indices: 
@@ -184,19 +187,19 @@ TextureImporter:
       name: Moniko_Walk_3
       rect:
         serializedVersion: 2
-        x: 195
-        y: 6
-        width: 57
-        height: 47
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+        x: 192
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 66471320ce672644f8a638c150a6b3ba
+      spriteID: 1245c27fd5fa2ba4cb47000c8dc5c9e9
       internalID: -8225110304890342753
       vertices: []
       indices: 
@@ -206,19 +209,19 @@ TextureImporter:
       name: Moniko_Walk_4
       rect:
         serializedVersion: 2
-        x: 258
-        y: 6
-        width: 58
-        height: 48
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+        x: 256
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 811352de2cd80144a9a7856704bcc3ba
+      spriteID: d7882c48b693d5048a37985585c39cb1
       internalID: -7814954742952567727
       vertices: []
       indices: 
@@ -228,20 +231,42 @@ TextureImporter:
       name: Moniko_Walk_5
       rect:
         serializedVersion: 2
-        x: 323
-        y: 6
-        width: 57
-        height: 47
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+        x: 320
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 9d61af33df9533a409fc985bc1020c29
+      spriteID: 5344477761655a14e8a96dec97433772
       internalID: -4743906097335544613
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Moniko_Walk_6
+      rect:
+        serializedVersion: 2
+        x: 384
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 9e21a3a3c4e616742bc02d01ab8f75c2
+      internalID: 2102638385
       vertices: []
       indices: 
       edges: []
@@ -268,6 +293,7 @@ TextureImporter:
       Moniko_Walk_3: -8225110304890342753
       Moniko_Walk_4: -7814954742952567727
       Moniko_Walk_5: -4743906097335544613
+      Moniko_Walk_6: 2102638385
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

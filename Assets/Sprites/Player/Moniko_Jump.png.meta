@@ -130,19 +130,19 @@ TextureImporter:
       name: Moniko_Jump_0
       rect:
         serializedVersion: 2
-        x: 2
-        y: 6
-        width: 58
-        height: 48
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+        x: 0
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 8be774d382c5f1e449dba7585fdc5b24
+      spriteID: 1f2633c99f6cb82409367c3514ef0803
       internalID: 1416774934069354451
       vertices: []
       indices: 
@@ -152,19 +152,19 @@ TextureImporter:
       name: Moniko_Jump_1
       rect:
         serializedVersion: 2
-        x: 66
-        y: 6
-        width: 58
-        height: 45
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+        x: 64
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 068ee982267adfb4284616ba630fb7f8
+      spriteID: c3a126f3fd27cd34a8f78eda3c83eee2
       internalID: 5299596247286897887
       vertices: []
       indices: 
@@ -174,19 +174,19 @@ TextureImporter:
       name: Moniko_Jump_2
       rect:
         serializedVersion: 2
-        x: 130
-        y: 6
-        width: 58
-        height: 42
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+        x: 128
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 2c74b7d169029d24fa1649036f5e420a
+      spriteID: 193144931df46a843a122044ac540222
       internalID: -6828646664750963926
       vertices: []
       indices: 
@@ -196,19 +196,19 @@ TextureImporter:
       name: Moniko_Jump_3
       rect:
         serializedVersion: 2
-        x: 194
-        y: 6
-        width: 58
-        height: 47
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+        x: 192
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: d9a87e21f80e2e54ab19e677c3dd3412
+      spriteID: e21d892e14861a24d8a52136c2330d63
       internalID: 7398715161062463888
       vertices: []
       indices: 
@@ -218,19 +218,19 @@ TextureImporter:
       name: Moniko_Jump_4
       rect:
         serializedVersion: 2
-        x: 258
-        y: 7
-        width: 58
-        height: 46
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+        x: 256
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: cef73ff32ee6c8d478e2179096f1af96
+      spriteID: 1496b0d0e1be71d44a2a04cd48aa8a86
       internalID: -325611545660794504
       vertices: []
       indices: 
@@ -240,19 +240,19 @@ TextureImporter:
       name: Moniko_Jump_5
       rect:
         serializedVersion: 2
-        x: 322
-        y: 15
-        width: 58
-        height: 38
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+        x: 320
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: d96d435231cefd140a7ee89bc077f6cc
+      spriteID: 2684de128f446954facc2353ef42f530
       internalID: 182158484232400156
       vertices: []
       indices: 
@@ -262,19 +262,19 @@ TextureImporter:
       name: Moniko_Jump_6
       rect:
         serializedVersion: 2
-        x: 386
-        y: 7
-        width: 58
-        height: 46
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+        x: 384
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: b3621c5e6888b264b90c6d9eb9240ed7
+      spriteID: 3cfd3f30fb9c06848adc0ac9602eb85f
       internalID: -8480594020410681975
       vertices: []
       indices: 
@@ -284,19 +284,19 @@ TextureImporter:
       name: Moniko_Jump_7
       rect:
         serializedVersion: 2
-        x: 450
-        y: 6
-        width: 58
-        height: 47
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+        x: 448
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: a7b45d9326b14c543b823ba3a925616e
+      spriteID: a0956c5493a729d42a1c2a73fac9b24b
       internalID: 5367355725616165778
       vertices: []
       indices: 
@@ -306,19 +306,19 @@ TextureImporter:
       name: Moniko_Jump_8
       rect:
         serializedVersion: 2
-        x: 514
-        y: 6
-        width: 58
-        height: 45
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+        x: 512
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 7e5bb453c50ce85469afe91cef569fbb
+      spriteID: 0693e8b14945a7344b38920514870a36
       internalID: 7602589362436128596
       vertices: []
       indices: 
@@ -328,19 +328,19 @@ TextureImporter:
       name: Moniko_Jump_9
       rect:
         serializedVersion: 2
-        x: 578
-        y: 6
-        width: 58
-        height: 48
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+        x: 576
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 3d24ab9752009604ebdf4678156b4e37
+      spriteID: c5f8725783c3dc349b60e6b86e5ebe95
       internalID: -8312814831360762291
       vertices: []
       indices: 

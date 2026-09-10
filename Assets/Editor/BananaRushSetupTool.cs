@@ -43,6 +43,8 @@ public static class BananaRushSetupTool
 
             Sprite[] walkFrames = SliceUniformGrid($"{PlayerSpritesDir}/Moniko_Walk.png", 64, 64, "Moniko_Walk", new Vector2(0.5f, 0f));
             Sprite[] jumpFrames = SliceUniformGrid($"{PlayerSpritesDir}/Moniko_Jump.png", 64, 64, "Moniko_Jump", new Vector2(0.5f, 0f));
+            walkFrames = walkFrames.Where(s => s != null).ToArray();
+            jumpFrames = jumpFrames.Where(s => s != null).ToArray();
             Debug.Log($"[BananaRush] Walk frames: {walkFrames.Length}, Jump frames: {jumpFrames.Length}");
 
             ConfigureSingleSprite($"{PropsSpritesDir}/Banana.png", new Vector2(0.5f, 0.5f), FilterMode.Point);
@@ -122,6 +124,7 @@ public static class BananaRushSetupTool
         importer.textureCompression = TextureImporterCompression.Uncompressed;
         importer.mipmapEnabled = false;
         importer.alphaIsTransparency = true;
+        importer.isReadable = true;
         importer.SaveAndReimport();
 
         var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
@@ -134,7 +137,13 @@ public static class BananaRushSetupTool
         {
             for (int col = 0; col < columns; col++)
             {
-                rects.Add(($"{namePrefix}_{index}", new Rect(col * frameWidth, row * frameHeight, frameWidth, frameHeight)));
+                var rect = new Rect(col * frameWidth, row * frameHeight, frameWidth, frameHeight);
+                if (!HasOpaquePixels(texture, rect))
+                {
+                    continue;
+                }
+
+                rects.Add(($"{namePrefix}_{index}", rect));
                 index++;
             }
         }
@@ -251,13 +260,30 @@ public static class BananaRushSetupTool
         ISpriteEditorDataProvider dataProvider = factory.GetSpriteEditorDataProviderFromObject(importer);
         dataProvider.InitSpriteEditorDataProvider();
 
-        SpriteRect[] spriteRects = rects.Select(r => new SpriteRect
+        // Reusar los spriteID existentes por nombre: si se regeneran, los
+        // clips de animacion quedan apuntando a IDs viejos y ese frame se
+        // ve vacio (el personaje "desaparece" un instante).
+        SpriteRect[] existing = dataProvider.GetSpriteRects() ?? Array.Empty<SpriteRect>();
+        var existingByName = existing.ToDictionary(r => r.name, r => r);
+
+        SpriteRect[] spriteRects = rects.Select(r =>
         {
-            name = r.name,
-            spriteID = GUID.Generate(),
-            rect = r.rect,
-            pivot = pivot,
-            alignment = SpriteAlignment.Custom,
+            if (existingByName.TryGetValue(r.name, out SpriteRect old))
+            {
+                old.rect = r.rect;
+                old.pivot = pivot;
+                old.alignment = SpriteAlignment.Custom;
+                return old;
+            }
+
+            return new SpriteRect
+            {
+                name = r.name,
+                spriteID = GUID.Generate(),
+                rect = r.rect,
+                pivot = pivot,
+                alignment = SpriteAlignment.Custom,
+            };
         }).ToArray();
 
         dataProvider.SetSpriteRects(spriteRects);
@@ -344,7 +370,12 @@ public static class BananaRushSetupTool
 
         AnimationClip idleClip = CreateSpriteClip($"{AnimationsDir}/Moniko_Idle.anim", new[] { idleSprite }, 4f, true);
         AnimationClip walkClip = CreateSpriteClip($"{AnimationsDir}/Moniko_Walk.anim", walkFrames, 10f, true);
-        AnimationClip jumpClip = CreateSpriteClip($"{AnimationsDir}/Moniko_Jump.anim", jumpFrames, 12f, true);
+
+        // El spritesheet de salto arranca en pose de piso y termina aterrizando.
+        // En el aire solo queremos las poses de vuelo, y sin loop: si loopea
+        // se ve el agachado otra vez a mitad de salto.
+        Sprite[] airborneJump = PickAirborneJumpFrames(jumpFrames);
+        AnimationClip jumpClip = CreateSpriteClip($"{AnimationsDir}/Moniko_Jump.anim", airborneJump, 12f, false);
 
         string controllerPath = $"{AnimationsDir}/Moniko.controller";
         if (File.Exists(controllerPath))
@@ -412,8 +443,48 @@ public static class BananaRushSetupTool
         configureConditions(transition);
     }
 
+    private static bool HasOpaquePixels(Texture2D texture, Rect rect)
+    {
+        int x = Mathf.Clamp(Mathf.RoundToInt(rect.x), 0, texture.width - 1);
+        int y = Mathf.Clamp(Mathf.RoundToInt(rect.y), 0, texture.height - 1);
+        int width = Mathf.Clamp(Mathf.RoundToInt(rect.width), 1, texture.width - x);
+        int height = Mathf.Clamp(Mathf.RoundToInt(rect.height), 1, texture.height - y);
+
+        Color32[] pixels = texture.GetPixels32();
+        for (int py = y; py < y + height; py++)
+        {
+            int row = py * texture.width;
+            for (int px = x; px < x + width; px++)
+            {
+                if (pixels[row + px].a > 10)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static Sprite[] PickAirborneJumpFrames(Sprite[] jumpFrames)
+    {
+        Sprite[] valid = jumpFrames.Where(s => s != null).ToArray();
+        if (valid.Length >= 5)
+        {
+            return valid.Skip(2).Take(valid.Length - 3).ToArray();
+        }
+
+        return valid;
+    }
+
     private static AnimationClip CreateSpriteClip(string path, Sprite[] frames, float frameRate, bool loop)
     {
+        frames = frames.Where(s => s != null).ToArray();
+        if (frames.Length == 0)
+        {
+            throw new InvalidOperationException($"No hay sprites validos para el clip {path}.");
+        }
+
         if (File.Exists(path))
         {
             AssetDatabase.DeleteAsset(path);
@@ -431,19 +502,17 @@ public static class BananaRushSetupTool
             propertyName = "m_Sprite",
         };
 
-        // Ojo con el largo del clip: si el ultimo keyframe queda justo en el
-        // ultimo frame, ese frame se ve solo un instante antes de que el
-        // loop vuelva al frame 0 (se ve "cortado"/tironeado). Por eso se
-        // agrega un keyframe de cierre que repite el frame 0 al llegar a
-        // frameCount/frameRate, asi el ultimo frame se sostiene su duracion
-        // completa antes de reiniciar el ciclo.
+        // Si el ultimo keyframe queda justo en el ultimo frame, ese frame se
+        // ve un instante. Se agrega un key extra al final: en loop repite el
+        // primero (ciclo parejo); si no loopea, sostiene el ultimo sprite.
         var keyframes = new ObjectReferenceKeyframe[frames.Length + 1];
         for (int i = 0; i < frames.Length; i++)
         {
             keyframes[i] = new ObjectReferenceKeyframe { time = i / frameRate, value = frames[i] };
         }
 
-        keyframes[frames.Length] = new ObjectReferenceKeyframe { time = frames.Length / frameRate, value = frames[0] };
+        Sprite holdSprite = loop ? frames[0] : frames[frames.Length - 1];
+        keyframes[frames.Length] = new ObjectReferenceKeyframe { time = frames.Length / frameRate, value = holdSprite };
 
         AnimationUtility.SetObjectReferenceCurve(clip, binding, keyframes);
         AssetDatabase.CreateAsset(clip, path);
