@@ -354,7 +354,19 @@ public static class BananaRushSetupTool
 
         AnimatorController controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
         controller.AddParameter("Speed", AnimatorControllerParameterType.Float);
-        controller.AddParameter("Grounded", AnimatorControllerParameterType.Bool);
+
+        // Ojo: el default tiene que ser "true". Los personajes arrancan
+        // parados en el piso, y con default "false" el Animator entra al
+        // estado Idle pero ENSEGUIDA evalua la transicion "Idle -> Jump
+        // cuando Grounded=false" (que ya se cumple con el default, antes de
+        // que el primer FixedUpdateNetwork llegue a corregirlo) y se queda
+        // trabado mostrando la pose de salto para siempre.
+        controller.AddParameter(new AnimatorControllerParameter
+        {
+            name = "Grounded",
+            type = AnimatorControllerParameterType.Bool,
+            defaultBool = true,
+        });
 
         AnimatorStateMachine sm = controller.layers[0].stateMachine;
 
@@ -739,6 +751,71 @@ public static class BananaRushSetupTool
         UnityEngine.Object.DestroyImmediate(tex);
 
         EditorApplication.Exit(0);
+    }
+
+    /// <summary>
+    /// Prueba puntual para el bug de "el mono arranca trabado en la pose de
+    /// salto": crea un Animator con el controller de Moniko, lo hace avanzar
+    /// varios frames SIN llamar SetBool (el peor caso, para que dependa
+    /// pura y exclusivamente del default del parametro "Grounded") y loguea
+    /// en que estado termina. Si el default esta bien (true), tiene que
+    /// quedarse en Idle.
+    /// </summary>
+    [MenuItem("Tools/Banana Rush/Test Animator Grounded Default")]
+    public static void TestAnimatorGroundedDefault()
+    {
+        var go = new GameObject("AnimTest", typeof(SpriteRenderer), typeof(Animator));
+        try
+        {
+            var controller = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>($"{AnimationsDir}/Moniko.controller");
+            if (controller == null)
+            {
+                Debug.LogError("[BananaRush] TEST: no se encontro Moniko.controller. Corre RunAll primero.");
+                return;
+            }
+
+            var animator = go.GetComponent<Animator>();
+            animator.runtimeAnimatorController = controller;
+
+            LogAnimatorState(animator, "frame 0 (recien creado)");
+
+            for (int i = 0; i < 20; i++)
+            {
+                animator.Update(0.05f);
+            }
+
+            LogAnimatorState(animator, "despues de 20 frames sin llamar SetBool");
+
+            // Ahora el ciclo real: saltar (Grounded=false) y aterrizar
+            // (Grounded=true) de nuevo, para confirmar que las transiciones
+            // van y vuelven bien (no que quedo pegado en Idle porque las
+            // transiciones estan rotas).
+            animator.SetBool("Grounded", false);
+            for (int i = 0; i < 5; i++)
+            {
+                animator.Update(0.05f);
+            }
+
+            LogAnimatorState(animator, "SetBool(Grounded,false) + 5 frames (deberia ser Jump)");
+
+            animator.SetBool("Grounded", true);
+            for (int i = 0; i < 5; i++)
+            {
+                animator.Update(0.05f);
+            }
+
+            LogAnimatorState(animator, "SetBool(Grounded,true) + 5 frames (deberia volver a Idle)");
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(go);
+        }
+    }
+
+    private static void LogAnimatorState(Animator animator, string label)
+    {
+        AnimatorStateInfo state = animator.GetCurrentAnimatorStateInfo(0);
+        Debug.Log($"[BananaRush] TEST ANIMATOR [{label}]: isIdle={state.IsName("Idle")} isWalk={state.IsName("Walk")} isJump={state.IsName("Jump")} normalizedTime={state.normalizedTime:F2}");
     }
 
     private static void SpawnTestPlayer(GameObject prefab, Vector3 position, Color tint, bool flip)

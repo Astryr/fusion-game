@@ -90,6 +90,14 @@ public class PlayerController : NetworkBehaviour
 
             string nickname = NetworkRunnerHandler.Instance != null ? NetworkRunnerHandler.Instance.LocalNickname : null;
             Nickname = string.IsNullOrWhiteSpace(nickname) ? $"Jugador {Object.InputAuthority.PlayerId + 1}" : nickname;
+
+            // Arranca parado en el piso. Si no se fija esto de una, el
+            // Animator arranca con su propio default (Grounded=false) y
+            // transiciona a la animacion de salto antes de que el primer
+            // FixedUpdateNetwork llegue a corregirlo, dejando al mono
+            // "flotando" con la pose de salto para siempre.
+            _grounded = true;
+            NetGrounded = true;
         }
 
         ApplyColor();
