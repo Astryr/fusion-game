@@ -195,9 +195,53 @@ ya está todo en el repo.
 Photon Fusion se conecta a través de la nube de Photon, así que **no hace
 falta configurar puertos ni estar en la misma red** para probar con
 compañeros en otra casa: alcanza con que todos escriban el mismo nombre de
-sala.
+sala. Tampoco hace falta abrir el juego en el instante exacto: el primero
+en conectarse crea la sala y esta queda abierta hasta que se desconecta, así
+que el resto se puede unir en cualquier momento mientras siga viva.
 
-Para probar en una sola máquina (mientras se suma el resto del equipo):
+### Jugar con alguien que no es del equipo (ej. un amigo probando el juego)
+
+Dos formas, de más simple a más completa para esa persona:
+
+1. **Pasarle un build ya compilado (lo más simple si no va a programar)**:
+   generá un ejecutable (ver "Probar en una sola máquina" más abajo, paso 1)
+   y compartíselo por Drive/Discord/WeTransfer. Tu amigo lo abre directo, sin
+   instalar Unity ni clonar nada.
+2. **Que clone el repositorio** (si va a laburar en el proyecto): como es
+   privado, primero sumalo como colaborador (GitHub → Settings →
+   Collaborators → Add people). Una vez que acepte la invitación, sigue la
+   sección **B** de esta guía — el SDK de Photon y el AppID ya están
+   commiteados, así que **no** tiene que repetir la configuración inicial
+   (sección A): solo clonar, abrir el proyecto en Unity y darle Play.
+
+Cualquiera de las dos formas termina igual: cada uno conecta por su lado
+escribiendo **el mismo nombre de sala** (ej. `Sala1`) en la pantalla inicial.
+
+### Posible problema: región de Photon distinta
+
+Este proyecto usa selección automática de "mejor región" (no hay una región
+fija configurada en `PhotonAppSettings`). Si los dos están en la misma zona
+geográfica, Photon normalmente les asigna la misma región solo y no van a
+notar nada. Pero si tu amigo está en otro país (o conecta por una red muy
+distinta — VPN, datos móviles, etc.), podría terminar en una región de
+Photon diferente a la tuya — y ahí, **aunque escriban el mismo nombre de
+sala, no se van a poder ver** (las salas son por región, no globales). Si
+sospechan que les está pasando esto, avisen para fijar una región fija en
+`Assets/Photon/Fusion/Resources/PhotonAppSettings.asset` (campo
+`FixedRegion`) y que los dos apunten siempre al mismo datacenter.
+
+### Cómo confirmar que funcionó
+
+- Los dos pasan de la escena `MainMenu` a `Game` sin quedarse trabados en
+  "Conectando...".
+- Cada uno ve **dos** cuadrados de colores distintos (el propio y el del
+  otro) moviéndose de forma independiente.
+- Al mover WASD/flechas de un lado, el movimiento se ve reflejado del otro
+  lado (con la latencia normal de internet).
+
+Si algo de esto no pasa, ver la sección **D. Problemas comunes** más abajo.
+
+### Probar en una sola máquina (mientras se suma el resto del equipo)
 
 1. Con el proyecto abierto, **File > Build Settings > Build** para generar
    un ejecutable (asegurate de que ambas escenas estén en la lista, ya
