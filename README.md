@@ -15,17 +15,24 @@ bananas que caen desde arriba antes de que toquen el piso.
 - Cada jugador elige un **nombre** antes de conectarse (junto con el nombre
   de sala) y controla a **Moniko**, un mono con un tinte de color distinto
   por jugador para diferenciarse.
+- La partida **no arranca hasta que haya al menos 2 jugadores** en la sala
+  (ver `_minPlayersToStart` en `BananaGameManager`). Mientras se espera, se
+  muestra "Esperando jugadores...". Al llegar a la cantidad necesaria
+  arranca una **cuenta regresiva de 5 segundos** para que todos se
+  preparen antes de que empiecen a caer bananas.
 - Movimiento: **A/D** o flechas izquierda/derecha para caminar, **Espacio**
-  (o W / flecha arriba) para un salto chico. No hay colisión entre
-  jugadores (se pueden atravesar), pero sí con el piso.
+  (o W / flecha arriba) para un salto. No hay colisión entre
+  jugadores (se pueden atravesar), pero sí con el piso — el mapa es
+  "cerrado" (no hay espacio a los costados para salirse de la zona
+  visible).
 - Bananas normales y explosivas caen desde arriba del mapa a velocidad
   variable: si un jugador la toca antes de que llegue al piso suma
-  **+5 puntos** (normal) o resta **-3 puntos** (explosiva, con mínimo 0).
+  **+5 puntos** (normal) o resta **-5 puntos** (explosiva, con mínimo 0).
   Si la banana llega al piso sin que nadie la toque, se pierde sin sumar ni
   restar.
 - Arriba a la izquierda de la pantalla hay una tabla de puntajes en vivo,
   ordenada de mayor a menor.
-- El primer jugador en llegar al puntaje objetivo (30 por defecto, ver
+- El primer jugador en llegar al puntaje objetivo (**100** por defecto, ver
   `BananaGameManager` en el Inspector) gana: la pantalla se pone negra y
   aparece su nombre en el centro, en la pantalla de **todos** los jugadores.
 
@@ -54,8 +61,13 @@ bananas que caen desde arriba antes de que toquen el piso.
 - Bananas normales y explosivas (`BananaController`) que caen desde arriba,
   otorgan/restan puntos al ser atrapadas y desaparecen sin efecto si tocan
   el piso.
-- Tabla de puntajes en vivo y pantalla de victoria con el nombre del
-  ganador (`GameHUDController`).
+- Espera de jugadores + cuenta regresiva antes de arrancar la partida, y
+  tabla de puntajes en vivo + pantalla de victoria con el nombre del
+  ganador (`GameHUDController`), todo sincronizado vía el estado
+  `[Networked]` de `BananaGameManager`.
+- Tipografía propia (Bangers, `Assets/Resources/Fonts/BananaRushTitle.ttf`,
+  Open Font License) para el título "BANANA RUSH" del menú y el anuncio
+  del ganador (`UIFactory.CreateTitleText`).
 - Herramienta de editor (`Assets/Editor/BananaRushSetupTool.cs`, menú
   **Tools > Banana Rush**) que importa los sprites, genera las animaciones
   y arma los prefabs/escena — pensada para volver a correrse si se cambia

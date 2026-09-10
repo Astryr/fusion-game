@@ -22,8 +22,12 @@ public class GameHUDController : MonoBehaviour
     private GameObject _endScreen;
     private Text _endScreenText;
 
+    private GameObject _waitingPanel;
+    private Text _waitingText;
+
     private float _scoreboardTimer;
     private bool _gameOverShown;
+    private int _playerCount = 1;
 
     private void Awake()
     {
@@ -66,6 +70,7 @@ public class GameHUDController : MonoBehaviour
             RefreshScoreboard();
         }
 
+        UpdateWaitingPanel();
         CheckGameOver();
     }
 
@@ -85,6 +90,7 @@ public class GameHUDController : MonoBehaviour
         leaveButton.onClick.AddListener(HandleLeaveClicked);
 
         BuildScoreboard(canvas.transform);
+        BuildWaitingPanel(canvas.transform);
         BuildEndScreen(canvas.transform);
     }
 
@@ -102,12 +108,24 @@ public class GameHUDController : MonoBehaviour
         UIFactory.SetRect(_scoreboardContent, new Vector2(0, 1), new Vector2(1, 1), new Vector2(4, -170), new Vector2(-4, -28));
     }
 
+    private void BuildWaitingPanel(Transform canvasTransform)
+    {
+        _waitingPanel = UIFactory.CreatePanel(canvasTransform, "WaitingPanel", new Color(0, 0, 0, 0.55f),
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-230, -60), new Vector2(230, 60)).gameObject;
+
+        _waitingText = UIFactory.CreateText(_waitingPanel.transform, string.Empty, 26, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.35f));
+        UIFactory.SetRect(_waitingText.rectTransform, Vector2.zero, Vector2.one, new Vector2(10, 5), new Vector2(-10, -5));
+
+        _waitingPanel.SetActive(false);
+    }
+
     private void BuildEndScreen(Transform canvasTransform)
     {
         _endScreen = UIFactory.CreatePanel(canvasTransform, "EndScreen", Color.black,
             Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
 
-        _endScreenText = UIFactory.CreateText(_endScreen.transform, string.Empty, 48, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.35f));
+        _endScreenText = UIFactory.CreateTitleText(_endScreen.transform, string.Empty, 56,
+            new Color(1f, 0.82f, 0.20f), new Color(0.35f, 0.17f, 0.05f));
         UIFactory.SetRect(_endScreenText.rectTransform, Vector2.zero, Vector2.one, new Vector2(40, 0), new Vector2(-40, 0));
 
         _endScreen.SetActive(false);
@@ -160,6 +178,41 @@ public class GameHUDController : MonoBehaviour
         return row;
     }
 
+    /// <summary>
+    /// Antes de que arranque la partida (<see cref="BananaGameManager.MatchStarted"/>)
+    /// muestra "esperando jugadores" o la cuenta regresiva, segun corresponda.
+    /// Es la misma logica en todos los clientes porque mira el mismo estado
+    /// [Networked] del director de partida.
+    /// </summary>
+    private void UpdateWaitingPanel()
+    {
+        var manager = BananaGameManager.Instance;
+        if (manager == null || manager.MatchStarted || manager.IsGameOver)
+        {
+            if (_waitingPanel.activeSelf)
+            {
+                _waitingPanel.SetActive(false);
+            }
+
+            return;
+        }
+
+        if (!_waitingPanel.activeSelf)
+        {
+            _waitingPanel.SetActive(true);
+        }
+
+        if (manager.CountdownRemaining >= 0f)
+        {
+            int seconds = Mathf.CeilToInt(manager.CountdownRemaining);
+            _waitingText.text = seconds > 0 ? $"Arranca en {seconds}..." : "\u00a1Arranca!";
+        }
+        else
+        {
+            _waitingText.text = $"Esperando jugadores... ({_playerCount}/{manager.MinPlayersToStart})";
+        }
+    }
+
     private void CheckGameOver()
     {
         if (_gameOverShown)
@@ -191,6 +244,8 @@ public class GameHUDController : MonoBehaviour
 
     private void UpdateInfoText(int count)
     {
+        _playerCount = count;
+
         var handler = NetworkRunnerHandler.Instance;
         string sessionName = handler != null && !string.IsNullOrEmpty(handler.CurrentSessionName)
             ? handler.CurrentSessionName

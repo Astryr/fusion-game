@@ -65,14 +65,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4a4c5183bdaff4f4c87fe068df718861, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BananaGameManager
-  _targetScore: 30
+  _minPlayersToStart: 2
+  _countdownDuration: 5
+  _targetScore: 100
   _bananaPrefabName: Banana
   _bananaExplosivaPrefabName: BananaExplosiva
   _minSpawnInterval: 0.8
   _maxSpawnInterval: 1.5
-  _minFallSpeed: 3.5
-  _maxFallSpeed: 5
+  _minFallSpeed: 2.8
+  _maxFallSpeed: 3.8
   _explosiveChance: 0.25
+  _MatchStarted:
+    RawValue: 0
+  _CountdownRemaining: 0
   _IsGameOver:
     RawValue: 0
   _WinnerName:

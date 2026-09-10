@@ -171,8 +171,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerController
   _moveSpeed: 8
-  _jumpForce: 7
-  _gravity: 34
+  _jumpForce: 9
+  _gravity: 20
   _maxFallSpeed: 20
   _animator: {fileID: 5829392341988710042}
   _Score: 0

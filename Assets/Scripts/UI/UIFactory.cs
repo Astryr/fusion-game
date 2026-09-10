@@ -12,6 +12,9 @@ using UnityEngine.UI;
 /// </summary>
 public static class UIFactory
 {
+    private static Font _titleFont;
+    private const string TitleFontResourcePath = "Fonts/BananaRushTitle";
+
     public static Canvas CreateCanvas(string name)
     {
         var canvasGO = new GameObject(name, typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
@@ -82,6 +85,45 @@ public static class UIFactory
 
         SetRect(text.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         return text;
+    }
+
+    /// <summary>
+    /// Texto grande para titulos/banners (ej. "BANANA RUSH" en el menu o el
+    /// anuncio del ganador), con la tipografia divertida de
+    /// <c>Assets/Resources/Fonts/BananaRushTitle.ttf</c> y un borde (Outline)
+    /// para que se lea bien sobre cualquier fondo.
+    /// </summary>
+    public static Text CreateTitleText(Transform parent, string content, int fontSize, Color color, Color outlineColor)
+    {
+        var go = new GameObject("Title", typeof(Text), typeof(Outline));
+        go.transform.SetParent(parent, false);
+
+        var text = go.GetComponent<Text>();
+        text.font = GetTitleFont();
+        text.text = content;
+        text.fontSize = fontSize;
+        text.fontStyle = FontStyle.Normal;
+        text.alignment = TextAnchor.MiddleCenter;
+        text.color = color;
+        text.horizontalOverflow = HorizontalWrapMode.Overflow;
+        text.verticalOverflow = VerticalWrapMode.Overflow;
+
+        var outline = go.GetComponent<Outline>();
+        outline.effectColor = outlineColor;
+        outline.effectDistance = new Vector2(3f, -3f);
+
+        SetRect(text.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        return text;
+    }
+
+    private static Font GetTitleFont()
+    {
+        if (_titleFont == null)
+        {
+            _titleFont = Resources.Load<Font>(TitleFontResourcePath);
+        }
+
+        return _titleFont != null ? _titleFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
     }
 
     public static Button CreateButton(Transform parent, string label, Color backgroundColor)

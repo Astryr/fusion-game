@@ -63,7 +63,7 @@ public static class BananaRushSetupTool
 
             BuildPlayerPrefab(animatorController, idleSprite);
             BuildBananaPrefab("Banana", bananaSprite, 5);
-            BuildBananaPrefab("BananaExplosiva", bananaExplosivaSprite, -3);
+            BuildBananaPrefab("BananaExplosiva", bananaExplosivaSprite, -5);
             BuildGameManagerPrefab();
 
             UpdateGameScene(backgroundSprite, groundTile, dirtFillSprite);
@@ -419,11 +419,19 @@ public static class BananaRushSetupTool
             propertyName = "m_Sprite",
         };
 
-        var keyframes = new ObjectReferenceKeyframe[frames.Length];
+        // Ojo con el largo del clip: si el ultimo keyframe queda justo en el
+        // ultimo frame, ese frame se ve solo un instante antes de que el
+        // loop vuelva al frame 0 (se ve "cortado"/tironeado). Por eso se
+        // agrega un keyframe de cierre que repite el frame 0 al llegar a
+        // frameCount/frameRate, asi el ultimo frame se sostiene su duracion
+        // completa antes de reiniciar el ciclo.
+        var keyframes = new ObjectReferenceKeyframe[frames.Length + 1];
         for (int i = 0; i < frames.Length; i++)
         {
             keyframes[i] = new ObjectReferenceKeyframe { time = i / frameRate, value = frames[i] };
         }
+
+        keyframes[frames.Length] = new ObjectReferenceKeyframe { time = frames.Length / frameRate, value = frames[0] };
 
         AnimationUtility.SetObjectReferenceCurve(clip, binding, keyframes);
         AssetDatabase.CreateAsset(clip, path);
@@ -504,8 +512,8 @@ public static class BananaRushSetupTool
         var playerController = root.GetComponent<PlayerController>();
         var so = new SerializedObject(playerController);
         so.FindProperty("_moveSpeed").floatValue = 8f;
-        so.FindProperty("_jumpForce").floatValue = 7f;
-        so.FindProperty("_gravity").floatValue = 34f;
+        so.FindProperty("_jumpForce").floatValue = 9f;
+        so.FindProperty("_gravity").floatValue = 20f;
         so.FindProperty("_maxFallSpeed").floatValue = 20f;
         so.FindProperty("_animator").objectReferenceValue = animator;
         so.ApplyModifiedPropertiesWithoutUndo();
@@ -516,6 +524,8 @@ public static class BananaRushSetupTool
         Debug.Log("[BananaRush] Player.prefab actualizado.");
     }
 
+    private const float BananaScale = 0.65f;
+
     private static void BuildBananaPrefab(string prefabName, Sprite sprite, int pointValue)
     {
         string path = $"{ResourcesDir}/{prefabName}.prefab";
@@ -524,6 +534,7 @@ public static class BananaRushSetupTool
         try
         {
             go.layer = LayerMask.NameToLayer("Banana");
+            go.transform.localScale = new Vector3(BananaScale, BananaScale, 1f);
 
             var spriteRenderer = go.AddComponent<SpriteRenderer>();
             spriteRenderer.sprite = sprite;
@@ -697,14 +708,14 @@ public static class BananaRushSetupTool
         var bananaPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{ResourcesDir}/Banana.prefab");
         var bananaExplosivaPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{ResourcesDir}/BananaExplosiva.prefab");
 
-        SpawnTestPlayer(playerPrefab, new Vector3(-14f, 0f, 0f), new Color(1.00f, 0.50f, 0.50f), false);
+        SpawnTestPlayer(playerPrefab, new Vector3(-12f, 0f, 0f), new Color(1.00f, 0.50f, 0.50f), false);
         SpawnTestPlayer(playerPrefab, new Vector3(-4f, 0f, 0f), new Color(0.55f, 0.75f, 1.00f), true);
-        SpawnTestPlayer(playerPrefab, new Vector3(6f, 0f, 0f), new Color(0.60f, 1.00f, 0.60f), false);
-        SpawnTestPlayer(playerPrefab, new Vector3(14f, 0f, 0f), Color.white, true);
+        SpawnTestPlayer(playerPrefab, new Vector3(4f, 0f, 0f), new Color(0.60f, 1.00f, 0.60f), false);
+        SpawnTestPlayer(playerPrefab, new Vector3(12f, 0f, 0f), Color.white, true);
 
-        UnityEngine.Object.Instantiate(bananaPrefab, new Vector3(-8f, 8f, 0f), Quaternion.identity);
-        UnityEngine.Object.Instantiate(bananaPrefab, new Vector3(2f, 12f, 0f), Quaternion.identity);
-        UnityEngine.Object.Instantiate(bananaExplosivaPrefab, new Vector3(10f, 6f, 0f), Quaternion.identity);
+        UnityEngine.Object.Instantiate(bananaPrefab, new Vector3(-6f, 6f, 0f), Quaternion.identity);
+        UnityEngine.Object.Instantiate(bananaPrefab, new Vector3(2f, 8f, 0f), Quaternion.identity);
+        UnityEngine.Object.Instantiate(bananaExplosivaPrefab, new Vector3(8f, 5f, 0f), Quaternion.identity);
 
         Camera cam = Camera.main;
         const int width = 1280;

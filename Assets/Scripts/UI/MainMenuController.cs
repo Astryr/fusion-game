@@ -44,32 +44,34 @@ public class MainMenuController : MonoBehaviour
     {
         var canvas = UIFactory.CreateCanvas("MainMenuCanvas");
 
-        var panel = UIFactory.CreatePanel(canvas.transform, "Panel", new Color(0.10f, 0.11f, 0.16f, 0.96f),
-            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-240, -210), new Vector2(240, 210));
+        // Titulo grande arriba de todo, fuera del panel de conexion.
+        var title = UIFactory.CreateTitleText(canvas.transform, "BANANA RUSH", 72,
+            new Color(1f, 0.82f, 0.20f), new Color(0.35f, 0.17f, 0.05f));
+        UIFactory.SetRect(title.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(20, -170), new Vector2(-20, -20));
 
-        var title = UIFactory.CreateText(panel, "Banana Rush", 30, TextAnchor.MiddleCenter, Color.white);
-        UIFactory.SetRect(title.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(10, -65), new Vector2(-10, -10));
+        var panel = UIFactory.CreatePanel(canvas.transform, "Panel", new Color(0.10f, 0.11f, 0.16f, 0.96f),
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-240, -165), new Vector2(240, 165));
 
         var subtitle = UIFactory.CreateText(panel, "Elegi tu nombre y un nombre de sala para crear o unirte a una partida",
             14, TextAnchor.MiddleCenter, new Color(0.8f, 0.8f, 0.85f));
-        UIFactory.SetRect(subtitle.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(16, -105), new Vector2(-16, -68));
+        UIFactory.SetRect(subtitle.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(16, -48), new Vector2(-16, -12));
 
         _nicknameInput = UIFactory.CreateInputField(panel, "Tu nombre (ej: Tomi)");
         _nicknameInput.characterLimit = 14;
         UIFactory.SetRect(_nicknameInput.GetComponent<RectTransform>(),
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-150, -155), new Vector2(150, -113));
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-150, -98), new Vector2(150, -56));
 
         _sessionNameInput = UIFactory.CreateInputField(panel, "Nombre de sala (ej: Sala1)");
         UIFactory.SetRect(_sessionNameInput.GetComponent<RectTransform>(),
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-150, -205), new Vector2(150, -163));
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-150, -148), new Vector2(150, -106));
 
         _connectButton = UIFactory.CreateButton(panel, "Conectar", new Color(0.24f, 0.52f, 0.93f));
         UIFactory.SetRect(_connectButton.GetComponent<RectTransform>(),
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-100, -260), new Vector2(100, -215));
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-100, -203), new Vector2(100, -158));
         _connectButton.onClick.AddListener(HandleConnectClicked);
 
         _statusText = UIFactory.CreateText(panel, string.Empty, 14, TextAnchor.MiddleCenter, new Color(1f, 0.65f, 0.65f));
-        UIFactory.SetRect(_statusText.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(12, 12), new Vector2(-12, 55));
+        UIFactory.SetRect(_statusText.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(12, 12), new Vector2(-12, 50));
     }
 
     private async void HandleConnectClicked()

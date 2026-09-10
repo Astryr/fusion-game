@@ -23,8 +23,8 @@ public class PlayerController : NetworkBehaviour
 {
     [Header("Movimiento")]
     [SerializeField] private float _moveSpeed = 8f;
-    [SerializeField] private float _jumpForce = 7f;
-    [SerializeField] private float _gravity = 34f;
+    [SerializeField] private float _jumpForce = 9f;
+    [SerializeField] private float _gravity = 20f;
     [SerializeField] private float _maxFallSpeed = 20f;
 
     [Header("Referencias visuales")]
