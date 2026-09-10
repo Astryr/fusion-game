@@ -13,9 +13,10 @@ using UnityEngine.SceneManagement;
 /// (DontDestroyOnLoad) para seguir recibiendo callbacks de red mientras
 /// se juega en <c>Game</c>. Usa <see cref="GameMode.Shared"/> porque es el
 /// modo mas simple para arrancar (sin necesidad de manejar host dedicado ni
-/// reconciliacion), ideal para esta primera entrega. Ver JR4/JR5 (Photon,
-/// autoridad e input de red) para profundizar y, si el equipo lo necesita
-/// mas adelante, migrar a Host/Server mode.
+/// reconciliacion). Ademas de conectar y spawnear jugadores, el cliente que
+/// resulta ser el Master Client de la sala (Shared Mode) es quien spawnea el
+/// <see cref="BananaGameManager"/> (autoridad sobre la lluvia de bananas y la
+/// condicion de victoria).
 /// </summary>
 public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
 {
@@ -25,15 +26,24 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
     [Tooltip("Nombre del prefab del jugador, ubicado dentro de una carpeta Resources.")]
     [SerializeField] private string _playerPrefabResourcePath = "Player";
 
+    [Tooltip("Nombre del prefab del director de partida (bananas + victoria), en una carpeta Resources.")]
+    [SerializeField] private string _gameManagerPrefabResourcePath = "BananaGameManager";
+
     [Tooltip("Build Index de la escena de juego (debe estar registrada en Build Settings).")]
     [SerializeField] private int _gameSceneBuildIndex = 1;
 
     [Tooltip("Sesion por defecto si el campo de texto del menu queda vacio.")]
     [SerializeField] private string _defaultSessionName = "SalaPrincipal";
 
+    [Tooltip("Nombre de jugador por defecto si el campo de texto del menu queda vacio.")]
+    [SerializeField] private string _defaultNickname = "Jugador";
+
     public NetworkRunner Runner { get; private set; }
     public bool IsConnected { get; private set; }
     public string CurrentSessionName { get; private set; }
+
+    /// <summary>Nombre elegido en el menu antes de conectarse. Lo lee <see cref="PlayerController.Spawned"/>.</summary>
+    public string LocalNickname { get; private set; }
 
     public event Action OnConnectingEvent;
     public event Action OnConnectedEvent;
@@ -43,6 +53,8 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
 
     private readonly Dictionary<PlayerRef, NetworkObject> _spawnedPlayers = new Dictionary<PlayerRef, NetworkObject>();
     private NetworkObject _playerPrefab;
+    private NetworkObject _gameManagerPrefab;
+    private bool _gameManagerSpawnRequested;
 
     private void Awake()
     {
@@ -61,7 +73,7 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
     /// Al ser Shared Mode, no hay distincion real entre "host" y "cliente":
     /// el primero en usar ese nombre de sala la crea, el resto se une.
     /// </summary>
-    public async Task<bool> ConnectAsync(string sessionName)
+    public async Task<bool> ConnectAsync(string sessionName, string nickname)
     {
         if (Runner != null)
         {
@@ -70,6 +82,7 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         }
 
         sessionName = string.IsNullOrWhiteSpace(sessionName) ? _defaultSessionName : sessionName.Trim();
+        LocalNickname = string.IsNullOrWhiteSpace(nickname) ? _defaultNickname : nickname.Trim();
 
         OnConnectingEvent?.Invoke();
 
@@ -79,6 +92,14 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
             Debug.LogError($"[NetworkRunnerHandler] No se encontro '{_playerPrefabResourcePath}' dentro de una carpeta Resources. " +
                             "Revisa SETUP.md -> 'Crear el prefab del jugador'.");
         }
+
+        _gameManagerPrefab = Resources.Load<NetworkObject>(_gameManagerPrefabResourcePath);
+        if (_gameManagerPrefab == null)
+        {
+            Debug.LogError($"[NetworkRunnerHandler] No se encontro '{_gameManagerPrefabResourcePath}' dentro de una carpeta Resources.");
+        }
+
+        _gameManagerSpawnRequested = false;
 
         Runner = gameObject.AddComponent<NetworkRunner>();
         Runner.ProvideInput = true;
@@ -125,13 +146,44 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         Runner?.Shutdown();
     }
 
+    /// <summary>
+    /// Reparte a los jugadores en fila sobre el piso (el mapa de Banana Rush
+    /// es horizontal: se camina de punta a punta, no hay filas/columnas).
+    /// </summary>
     private static Vector3 GetSpawnPosition(int playerIndex)
     {
-        const float spacing = 2.5f;
-        const int columns = 4;
-        int row = playerIndex / columns;
-        int col = playerIndex % columns;
-        return new Vector3((col - (columns - 1) / 2f) * spacing, row * spacing, 0f);
+        // 4 posiciones (el rango tipico pedido es 2-4 jugadores); si hay mas
+        // se reparten en las mismas 4 columnas.
+        const int slots = 4;
+        float spread = BananaRushConfig.PlayerClampX * 0.85f;
+
+        int index = ((playerIndex % slots) + slots) % slots;
+        float t = index / (float)(slots - 1);
+        float x = Mathf.Lerp(-spread, spread, t);
+
+        return new Vector3(x, BananaRushConfig.GroundTopY, 0f);
+    }
+
+    /// <summary>
+    /// Solo el Master Client de la sala (Shared Mode) spawnea el director de
+    /// partida. Se marca con <see cref="NetworkSpawnFlags.SharedModeStateAuthMasterClient"/>
+    /// para que, si el Master Client se va, la autoridad migre sola al nuevo.
+    /// </summary>
+    private void TrySpawnGameManager(NetworkRunner runner)
+    {
+        if (_gameManagerSpawnRequested || _gameManagerPrefab == null)
+        {
+            return;
+        }
+
+        if (!runner.IsSharedModeMasterClient)
+        {
+            return;
+        }
+
+        _gameManagerSpawnRequested = true;
+        runner.Spawn(_gameManagerPrefab, Vector3.zero, Quaternion.identity, inputAuthority: null,
+            onBeforeSpawned: null, flags: NetworkSpawnFlags.SharedModeStateAuthMasterClient);
     }
 
     // ---------------------------------------------------------------
@@ -145,11 +197,16 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         // En Shared Mode cada cliente hace spawn de SU PROPIO personaje
         // (tiene la autoridad de estado sobre lo que crea), por eso se
         // compara contra runner.LocalPlayer.
-        if (_playerPrefab != null && player == runner.LocalPlayer)
+        if (player == runner.LocalPlayer)
         {
-            Vector3 spawnPosition = GetSpawnPosition(player.PlayerId);
-            NetworkObject playerObject = runner.Spawn(_playerPrefab, spawnPosition, Quaternion.identity, player);
-            _spawnedPlayers[player] = playerObject;
+            if (_playerPrefab != null)
+            {
+                Vector3 spawnPosition = GetSpawnPosition(player.PlayerId);
+                NetworkObject playerObject = runner.Spawn(_playerPrefab, spawnPosition, Quaternion.identity, player);
+                _spawnedPlayers[player] = playerObject;
+            }
+
+            TrySpawnGameManager(runner);
         }
 
         OnPlayerCountChangedEvent?.Invoke(runner.SessionInfo != null ? runner.SessionInfo.PlayerCount : 0);
@@ -173,14 +230,15 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
     public void OnInput(NetworkRunner runner, NetworkInput input)
     {
         var data = new NetworkInputData();
-        Vector2 direction = Vector2.zero;
 
-        if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) direction += Vector2.up;
-        if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) direction += Vector2.down;
-        if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) direction += Vector2.left;
-        if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) direction += Vector2.right;
+        float horizontal = 0f;
+        if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) horizontal -= 1f;
+        if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) horizontal += 1f;
 
-        data.MoveDirection = direction.normalized;
+        bool jumpPressed = Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow);
+
+        data.Horizontal = horizontal;
+        data.JumpPressed = jumpPressed;
         input.Set(data);
     }
 

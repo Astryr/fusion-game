@@ -105,41 +105,31 @@ conviene chequearlo una vez:
 Esto es importante para que los `.unity`, `.prefab` y `.asset` se puedan
 versionar y mergear bien en git.
 
-### A.6. Crear el prefab del jugador
+### A.6. Los prefabs del jugador y las bananas ya están listos
 
-Fusion necesita que el objeto que se "spawnea" en red sea un **prefab del
-proyecto** (no se puede crear a mano desde afuera de Unity sin el SDK
-instalado, por eso este es el único paso manual dentro del editor):
+A diferencia de la primera entrega, **ya no hace falta armar nada a mano**:
+`Assets/Resources/Player.prefab`, `Banana.prefab`, `BananaExplosiva.prefab`
+y `BananaGameManager.prefab` vienen commiteados con todo configurado
+(Network Object, Network Transform, colliders, Animator, etc.).
 
-1. En la ventana **Hierarchy** de la escena `MainMenu` (o cualquier escena
-   abierta), click derecho > **Create Empty**. Renombralo a `Player`.
-2. Con `Player` seleccionado, **Add Component**:
-   - **Sprite Renderer**.
-   - **Network Object** (buscalo escribiendo "Network Object"; es un
-     componente de Fusion).
-   - **Network Transform** (buscalo escribiendo "Network Transform"; sincroniza
-     posición/rotación por red).
-   - **Player Controller** (nuestro script, en `Assets/Scripts/Player`).
-3. Arrastrá el objeto `Player` desde la Hierarchy hacia la carpeta
-   **`Assets/Resources/`** en la ventana Project. Esto lo
-   convierte en un prefab (Unity te va a preguntar "Original Prefab" —
-   elegí esa opción).
-4. Borrá la instancia `Player` que quedó en la Hierarchy (ya está guardada
-   como prefab en `Resources`, el código la carga solo con
-   `Resources.Load<NetworkObject>("Player")`).
-5. Guardá la escena.
-
-> Si el nombre exacto de "Network Object" o "Network Transform" cambió en tu
-> versión del SDK, escribí simplemente "Network" en el buscador de Add
-> Component y vas a ver las opciones disponibles del namespace `Fusion`.
+Si en algún momento cambian el arte (otro sprite de Moniko, otras bananas,
+otro tileset de piso), no hay que repetir el armado a mano: corran
+**Tools > Banana Rush > Run Full Setup** desde el menú de Unity. Esa
+herramienta (`Assets/Editor/BananaRushSetupTool.cs`) reimporta los sprites,
+regenera las animaciones/Animator y vuelve a armar los prefabs y la escena
+`Game` a partir de lo que haya en `Assets/Sprites/`.
 
 ### A.7. Probar la conexión
 
 1. Abrí la escena `Assets/Scenes/MainMenu.unity`.
 2. Dale **Play**.
-3. Escribí un nombre de sala (por ejemplo `Sala1`) y tocá **Conectar**.
-4. Deberías pasar a la escena `Game` y ver tu cuadrado de color moverse con
-   WASD / flechas.
+3. Escribí tu nombre y un nombre de sala (por ejemplo `Sala1`) y tocá
+   **Conectar**.
+4. Deberías pasar a la escena `Game` y ver a tu Moniko parado sobre el
+   piso. Movete con **A/D** o las flechas y saltá con **Espacio**. Si
+   sueltan bananas desde arriba (podés esperar a que spawnee la primera,
+   tarda menos de 2 segundos), tocalas antes de que lleguen al piso para
+   sumar puntos.
 
 Si funcionó, ¡vas al último paso!
 
@@ -234,10 +224,12 @@ sospechan que les está pasando esto, avisen para fijar una región fija en
 
 - Los dos pasan de la escena `MainMenu` a `Game` sin quedarse trabados en
   "Conectando...".
-- Cada uno ve **dos** cuadrados de colores distintos (el propio y el del
-  otro) moviéndose de forma independiente.
-- Al mover WASD/flechas de un lado, el movimiento se ve reflejado del otro
-  lado (con la latencia normal de internet).
+- Cada uno ve **dos** Monikos con un tinte de color distinto (el propio y
+  el del otro) moviéndose de forma independiente, y a los dos nombres en
+  la tabla de puntajes arriba a la izquierda.
+- Al mover A/D (o las flechas) de un lado, el movimiento se ve reflejado
+  del otro lado (con la latencia normal de internet); las bananas que
+  caen se ven caer igual en las dos pantallas.
 
 Si algo de esto no pasa, ver la sección **D. Problemas comunes** más abajo.
 
@@ -269,10 +261,12 @@ click derecho sobre el nombre de la clase `NetworkRunnerHandler` > **Quick
 Actions and Refactorings > Implement interface** (el texto exacto varía
 según el IDE) para autogenerar los métodos que falten.
 
-**Falla la conexión y en la consola aparece "No se encontró 'Player' dentro
-de una carpeta Resources"**
-Falta crear el prefab del jugador (paso A.6) o no quedó dentro de una
-carpeta llamada exactamente `Resources`.
+**Falla la conexión y en la consola aparece "No se encontró 'Player' (o
+'BananaGameManager'/'Banana'/'BananaExplosiva') dentro de una carpeta
+Resources"**
+Alguno de esos prefabs no está en `Assets/Resources/` (o se borró/renombró
+por error). Si el problema es que faltan referencias de arte, correr
+**Tools > Banana Rush > Run Full Setup** los vuelve a armar.
 
 **Al conectar se ve la escena de Menu y la de Juego superpuestas**
 En `NetworkRunnerHandler.cs`, dentro de `ConnectAsync`, cambiá

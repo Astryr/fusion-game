@@ -2,13 +2,15 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Pantalla inicial del juego. Deja escribir un nombre de sala y conectarse:
-/// si la sala no existe la crea, si ya existe se une a ella (Shared Mode).
-/// Es la UI minima para poder probar que varias personas se puedan unir;
-/// se puede reemplazar mas adelante por el arte/diseño definitivo del GDD.
+/// Pantalla inicial del juego. Pide un nombre de jugador y un nombre de
+/// sala antes de conectar: si la sala no existe la crea, si ya existe se une
+/// a ella (Shared Mode). El nombre elegido viaja en
+/// <see cref="NetworkRunnerHandler.LocalNickname"/> y lo usa
+/// <c>PlayerController</c> para el cartel con el puntaje de cada jugador.
 /// </summary>
 public class MainMenuController : MonoBehaviour
 {
+    private InputField _nicknameInput;
     private InputField _sessionNameInput;
     private Text _statusText;
     private Button _connectButton;
@@ -43,22 +45,27 @@ public class MainMenuController : MonoBehaviour
         var canvas = UIFactory.CreateCanvas("MainMenuCanvas");
 
         var panel = UIFactory.CreatePanel(canvas.transform, "Panel", new Color(0.10f, 0.11f, 0.16f, 0.96f),
-            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-240, -180), new Vector2(240, 180));
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-240, -210), new Vector2(240, 210));
 
-        var title = UIFactory.CreateText(panel, "Juegos en Red", 30, TextAnchor.MiddleCenter, Color.white);
+        var title = UIFactory.CreateText(panel, "Banana Rush", 30, TextAnchor.MiddleCenter, Color.white);
         UIFactory.SetRect(title.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(10, -65), new Vector2(-10, -10));
 
-        var subtitle = UIFactory.CreateText(panel, "Escribi un nombre de sala para crear o unirte a una partida",
+        var subtitle = UIFactory.CreateText(panel, "Elegi tu nombre y un nombre de sala para crear o unirte a una partida",
             14, TextAnchor.MiddleCenter, new Color(0.8f, 0.8f, 0.85f));
         UIFactory.SetRect(subtitle.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(16, -105), new Vector2(-16, -68));
 
+        _nicknameInput = UIFactory.CreateInputField(panel, "Tu nombre (ej: Tomi)");
+        _nicknameInput.characterLimit = 14;
+        UIFactory.SetRect(_nicknameInput.GetComponent<RectTransform>(),
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-150, -155), new Vector2(150, -113));
+
         _sessionNameInput = UIFactory.CreateInputField(panel, "Nombre de sala (ej: Sala1)");
         UIFactory.SetRect(_sessionNameInput.GetComponent<RectTransform>(),
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-150, -155), new Vector2(150, -113));
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-150, -205), new Vector2(150, -163));
 
         _connectButton = UIFactory.CreateButton(panel, "Conectar", new Color(0.24f, 0.52f, 0.93f));
         UIFactory.SetRect(_connectButton.GetComponent<RectTransform>(),
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-100, -210), new Vector2(100, -165));
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-100, -260), new Vector2(100, -215));
         _connectButton.onClick.AddListener(HandleConnectClicked);
 
         _statusText = UIFactory.CreateText(panel, string.Empty, 14, TextAnchor.MiddleCenter, new Color(1f, 0.65f, 0.65f));
@@ -78,7 +85,7 @@ public class MainMenuController : MonoBehaviour
         _statusText.color = new Color(0.8f, 0.8f, 0.85f);
         _statusText.text = "Conectando...";
 
-        bool success = await handler.ConnectAsync(_sessionNameInput.text);
+        bool success = await handler.ConnectAsync(_sessionNameInput.text, _nicknameInput.text);
 
         // Si tuvo exito, Fusion carga la escena Game y este objeto se destruye solo.
         if (!success && _connectButton != null)
