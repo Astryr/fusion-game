@@ -29,6 +29,7 @@ public class PlayerController : NetworkBehaviour
 
     [Header("Referencias visuales")]
     [SerializeField] private Animator _animator;
+    [SerializeField] private RuntimeAnimatorController _animatorController;
 
     [Networked] private int PlayerColorIndex { get; set; }
     [Networked] private float NetHorizontal { get; set; }
@@ -74,15 +75,18 @@ public class PlayerController : NetworkBehaviour
         _rigidbody.freezeRotation = true;
         _rigidbody.interpolation = RigidbodyInterpolation2D.Interpolate;
 
-        if (_animator == null)
-        {
-            _animator = GetComponent<Animator>();
-        }
+        EnsureAnimatorReady();
+    }
+
+    private void OnEnable()
+    {
+        EnsureAnimatorReady();
     }
 
     public override void Spawned()
     {
         gameObject.name = $"Player_{Object.InputAuthority.PlayerId}";
+        EnsureAnimatorReady();
 
         if (Object.HasStateAuthority)
         {
@@ -198,10 +202,55 @@ public class PlayerController : NetworkBehaviour
             _spriteRenderer.flipX = !_facingRight;
         }
 
-        if (_animator != null)
+        if (!CanDriveAnimator())
         {
-            _animator.SetFloat(SpeedParam, Mathf.Abs(NetHorizontal));
-            _animator.SetBool(GroundedParam, NetGrounded);
+            EnsureAnimatorReady();
+            if (!CanDriveAnimator())
+            {
+                return;
+            }
         }
+
+        _animator.SetFloat(SpeedParam, Mathf.Abs(NetHorizontal));
+        _animator.SetBool(GroundedParam, NetGrounded);
+    }
+
+    private void EnsureAnimatorReady()
+    {
+        if (_animator == null)
+        {
+            _animator = GetComponent<Animator>();
+        }
+
+        if (_animator == null)
+        {
+            return;
+        }
+
+        if (_animator.runtimeAnimatorController == null && _animatorController != null)
+        {
+            _animator.runtimeAnimatorController = _animatorController;
+        }
+
+        _animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+        _animator.keepAnimatorStateOnDisable = true;
+        if (!_animator.enabled)
+        {
+            _animator.enabled = true;
+        }
+
+        if (_animator.runtimeAnimatorController != null && !_animator.isInitialized && _animator.isActiveAndEnabled)
+        {
+            _animator.Rebind();
+            _animator.Update(0f);
+        }
+    }
+
+    private bool CanDriveAnimator()
+    {
+        return _animator != null
+            && _animator.isActiveAndEnabled
+            && _animator.runtimeAnimatorController != null
+            && _animator.isInitialized;
     }
 }

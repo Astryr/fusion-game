@@ -42,7 +42,7 @@ TextureImporter:
     heightScale: 0.25
     normalMapFilter: 0
     flipGreenChannel: 0
-  isReadable: 0
+  isReadable: 1
   streamingMipmaps: 0
   streamingMipmapsPriority: 0
   vTOnly: 0
@@ -249,28 +249,6 @@ TextureImporter:
       indices: 
       edges: []
       weights: []
-    - serializedVersion: 2
-      name: Moniko_Walk_6
-      rect:
-        serializedVersion: 2
-        x: 384
-        y: 0
-        width: 64
-        height: 64
-      alignment: 9
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: 0
-      bones: []
-      spriteID: 9e21a3a3c4e616742bc02d01ab8f75c2
-      internalID: 2102638385
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
     outline: []
     customData: 
     physicsShape: []
@@ -293,7 +271,6 @@ TextureImporter:
       Moniko_Walk_3: -8225110304890342753
       Moniko_Walk_4: -7814954742952567727
       Moniko_Walk_5: -4743906097335544613
-      Moniko_Walk_6: 2102638385
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

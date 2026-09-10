@@ -175,6 +175,7 @@ MonoBehaviour:
   _gravity: 20
   _maxFallSpeed: 20
   _animator: {fileID: 5829392341988710042}
+  _animatorController: {fileID: 9100000, guid: c41f74b0ab3fed442b308e8618b135fb, type: 2}
   _Score: 0
   _Nickname:
     _length: 0
@@ -273,5 +274,5 @@ Animator:
   m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
-  m_KeepAnimatorStateOnDisable: 0
+  m_KeepAnimatorStateOnDisable: 1
   m_WriteDefaultValuesOnDisable: 0

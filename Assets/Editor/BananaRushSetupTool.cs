@@ -384,6 +384,9 @@ public static class BananaRushSetupTool
         }
 
         AnimatorController controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
+        AnimatorControllerLayer[] layers = controller.layers;
+        layers[0].defaultWeight = 1f;
+        controller.layers = layers;
         controller.AddParameter("Speed", AnimatorControllerParameterType.Float);
 
         // Ojo: el default tiene que ser "true". Los personajes arrancan
@@ -589,6 +592,8 @@ public static class BananaRushSetupTool
         }
 
         animator.runtimeAnimatorController = controller;
+        animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+        animator.keepAnimatorStateOnDisable = true;
 
         var playerController = root.GetComponent<PlayerController>();
         var so = new SerializedObject(playerController);
@@ -597,6 +602,7 @@ public static class BananaRushSetupTool
         so.FindProperty("_gravity").floatValue = 20f;
         so.FindProperty("_maxFallSpeed").floatValue = 20f;
         so.FindProperty("_animator").objectReferenceValue = animator;
+        so.FindProperty("_animatorController").objectReferenceValue = controller;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         PrefabUtility.SaveAsPrefabAsset(root, path);
