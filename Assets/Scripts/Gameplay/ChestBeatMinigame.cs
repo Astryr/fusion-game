@@ -12,6 +12,8 @@ public class ChestBeatMinigame : MonoBehaviour, IMiniGame
         _director = director;
     }
 
+    public void OnCountdownStarted() { }
+
     public void OnMatchStarted()
     {
         _started = true;

@@ -26,6 +26,8 @@ public class BananaRainMinigame : MonoBehaviour, IMiniGame
         _explosivePrefab = Resources.Load<NetworkObject>(_bananaExplosivaPrefabName);
     }
 
+    public void OnCountdownStarted() { }
+
     public void OnMatchStarted()
     {
         _spawnTimer = _minSpawnInterval;
@@ -74,37 +76,60 @@ public class BananaRainMinigame : MonoBehaviour, IMiniGame
             }
         }
 
+        float pressure = Mathf.Clamp01(_director.MatchTime / BananaRushConfig.BananaRegularDuration);
+        float minInterval = Mathf.Lerp(_minSpawnInterval, 0.22f, pressure);
+        float maxInterval = Mathf.Lerp(_maxSpawnInterval, 0.4f, pressure);
+
         _spawnTimer -= deltaTime;
         if (_spawnTimer > 0f)
         {
             return;
         }
 
-        SpawnBanana();
-        _spawnTimer = Random.Range(_minSpawnInterval, _maxSpawnInterval);
+        int burst = pressure > 0.65f ? 2 : 1;
+        if (pressure > 0.28f && Random.value < pressure * 0.45f)
+        {
+            burst++;
+        }
+
+        for (int i = 0; i < burst; i++)
+        {
+            SpawnBanana(pressure);
+        }
+
+        _spawnTimer = Random.Range(minInterval, maxInterval);
     }
 
     public void OnMatchEnded() { }
 
     public void Cleanup() { }
 
-    private void SpawnBanana()
+    private void SpawnBanana(float pressure)
     {
-        bool explosive = Random.value < _explosiveChance;
+        bool green = Random.value < BananaRushConfig.BananaGreenChance;
+        bool explosive = !green && Random.value < _explosiveChance;
         NetworkObject prefab = explosive ? _explosivePrefab : _bananaPrefab;
         if (prefab == null)
         {
             return;
         }
 
+        float minFall = Mathf.Lerp(_minFallSpeed, 5.2f, pressure);
+        float maxFall = Mathf.Lerp(_maxFallSpeed, 7.2f, pressure);
+        float fallSpeed = Random.Range(minFall, maxFall);
+        int points = explosive ? BananaRushConfig.BananaExplosivePoints : BananaRushConfig.BananaNormalPoints;
+        if (green)
+        {
+            points = BananaRushConfig.BananaGreenPoints;
+            fallSpeed *= 0.72f;
+        }
+
         float x = Random.Range(-BananaRushConfig.BananaSpawnX, BananaRushConfig.BananaSpawnX);
         Vector3 position = new Vector3(x, BananaRushConfig.BananaSpawnY, 0f);
-        float fallSpeed = Random.Range(_minFallSpeed, _maxFallSpeed);
-
         NetworkObject spawned = _director.Runner.Spawn(prefab, position, Quaternion.identity);
         if (spawned != null && spawned.TryGetComponent(out BananaController banana))
         {
-            banana.Configure(fallSpeed);
+            banana.Configure(fallSpeed, points);
         }
     }
 }

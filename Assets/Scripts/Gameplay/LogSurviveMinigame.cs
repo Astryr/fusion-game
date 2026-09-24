@@ -21,6 +21,8 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
         _peelPrefab = Resources.Load<NetworkObject>("BananaExplosiva");
     }
 
+    public void OnCountdownStarted() { }
+
     public void OnMatchStarted()
     {
         MiniGameWorld.Clear();

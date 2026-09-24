@@ -28,11 +28,42 @@ public class BananaController : NetworkBehaviour
     [Networked] private NetworkBool Consumed { get; set; }
     [Networked] private NetworkBool IsStunPeel { get; set; }
     [Networked] private float StunSeconds { get; set; }
+    [Networked] private int NetPointValue { get; set; }
+
+    public override void Spawned()
+    {
+        if (Object.HasStateAuthority)
+        {
+            NetPointValue = _pointValue;
+        }
+    }
+
+    public override void Render()
+    {
+        if (NetPointValue >= BananaRushConfig.BananaGreenPoints)
+        {
+            var renderer = GetComponent<SpriteRenderer>();
+            if (renderer != null)
+            {
+                renderer.color = new Color(0.2f, 0.95f, 0.28f, 1f);
+            }
+        }
+    }
 
     /// <summary>Fija la velocidad de caida de esta instancia (llamado por BananaGameManager al spawnear).</summary>
     public void Configure(float fallSpeed)
     {
+        Configure(fallSpeed, _pointValue);
+    }
+
+    public void Configure(float fallSpeed, int points)
+    {
         _fallSpeed = fallSpeed;
+        _pointValue = points;
+        if (Object != null && Object.HasStateAuthority)
+        {
+            NetPointValue = points;
+        }
     }
 
     public void BecomeStunPeel(float stunSeconds)
@@ -88,7 +119,8 @@ public class BananaController : NetworkBehaviour
         }
         else
         {
-            player.ReceiveBananaHit(_pointValue);
+            int points = NetPointValue != 0 ? NetPointValue : _pointValue;
+            player.ReceiveBananaHit(points);
         }
 
         RequestConsume();

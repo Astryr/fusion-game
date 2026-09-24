@@ -11,6 +11,7 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
     private Sprite _dirtSprite;
     private Sprite _flagSprite;
     private bool _started;
+    private bool _courseReady;
     private readonly HashSet<int> _finishedIds = new HashSet<int>();
 
     public void Setup(BananaGameManager director)
@@ -21,44 +22,39 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
         _flagSprite = SpriteFromPrefab("Banana");
     }
 
+    public void OnCountdownStarted()
+    {
+        PrepareCourse();
+        PlacePlayers(PlayerControlMode.Disabled, teleport: true);
+    }
+
     public void OnMatchStarted()
     {
-        MiniGameWorld.Clear();
-        _finishedIds.Clear();
-        BuildCourse();
+        if (!_courseReady)
+        {
+            PrepareCourse();
+        }
+
+        bool atStart = _director.MatchTime < 0.35f;
+        PlacePlayers(PlayerControlMode.Platformer, teleport: atStart);
         _started = true;
-
-        Camera cam = Camera.main;
-        if (cam != null)
-        {
-            cam.orthographicSize = 6.5f;
-        }
-
-        StageBackdrop.BeginScrollingStage(BananaRushConfig.ParkourMinX, BananaRushConfig.ParkourMaxX);
-
-        var players = _director.GetPlayers();
-        for (int i = 0; i < players.Length; i++)
-        {
-            float x = BananaRushConfig.ParkourStartX + i * 1.1f;
-            if (_director.Object.HasStateAuthority)
-            {
-                players[i].Teleport(new Vector3(x, 1.2f, 0f));
-            }
-            players[i].SetControlMode(PlayerControlMode.Platformer);
-            players[i].SetWorldBounds(BananaRushConfig.ParkourMinX, BananaRushConfig.ParkourMaxX, -20f, -6f);
-            players[i].SetPushEnabled(false);
-        }
-
-        if (_director.Object.HasStateAuthority)
-        {
-            _director.AvalancheX = BananaRushConfig.ParkourMinX - 2f;
-        }
     }
 
     public void Tick(float deltaTime, bool hasAuthority)
     {
+        if (!_courseReady)
+        {
+            return;
+        }
+
         if (!_started)
         {
+            FollowRaceCamera();
+            if (Camera.main != null)
+            {
+                StageBackdrop.Tick(Camera.main.transform.position);
+            }
+
             return;
         }
 
@@ -124,7 +120,7 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
             }
         }
 
-        FollowLocalPlayer();
+        FollowRaceCamera();
         UpdateAvalancheVisual();
         if (Camera.main != null)
         {
@@ -140,6 +136,7 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
     public void Cleanup()
     {
         _started = false;
+        _courseReady = false;
         MiniGameWorld.Clear();
         StageBackdrop.Clear();
         Camera cam = Camera.main;
@@ -158,7 +155,7 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
             platform = CreateFallbackSprite(new Color(0.45f, 0.32f, 0.18f));
         }
 
-        PlacePlatform("Start", new Vector3(BananaRushConfig.ParkourStartX + 2f, 0f, 0f), new Vector3(10f, 1f, 1f), platform);
+        PlacePlatform("Start", new Vector3(BananaRushConfig.ParkourStartX + 4f, 0f, 0f), new Vector3(16f, 1.2f, 1f), platform);
 
         float x = 6.2f;
         int index = 0;
@@ -206,19 +203,95 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
         wall.position = new Vector3(_director.AvalancheX - width * 0.35f, camY, 0f);
     }
 
-    private static void FollowLocalPlayer()
+    private void PrepareCourse()
     {
-        if (PlayerController.Local == null || Camera.main == null)
+        MiniGameWorld.Clear();
+        _finishedIds.Clear();
+        BuildCourse();
+
+        Camera cam = Camera.main;
+        if (cam != null)
+        {
+            cam.orthographicSize = 6.5f;
+            cam.transform.position = new Vector3(BananaRushConfig.ParkourStartX + 4f, 4f, -10f);
+        }
+
+        StageBackdrop.BeginScrollingStage(BananaRushConfig.ParkourMinX, BananaRushConfig.ParkourMaxX);
+        if (_director.Object.HasStateAuthority)
+        {
+            _director.AvalancheX = BananaRushConfig.ParkourMinX - 2f;
+        }
+
+        _courseReady = true;
+        _started = false;
+    }
+
+    private void PlacePlayers(PlayerControlMode mode, bool teleport)
+    {
+        var players = _director.GetPlayers();
+        for (int i = 0; i < players.Length; i++)
+        {
+            if (!players[i].IsSpawned)
+            {
+                continue;
+            }
+
+            if (teleport && _director.Object.HasStateAuthority)
+            {
+                float x = BananaRushConfig.ParkourStartX + 1.2f + i * 1.15f;
+                players[i].Teleport(new Vector3(x, BananaRushConfig.ParkourSpawnY, 0f));
+            }
+
+            players[i].SetControlMode(mode);
+            players[i].SetWorldBounds(BananaRushConfig.ParkourMinX, BananaRushConfig.ParkourMaxX, -20f, -6f);
+            players[i].SetPushEnabled(false);
+        }
+    }
+
+    private static void FollowRaceCamera()
+    {
+        if (Camera.main == null)
         {
             return;
         }
 
-        Vector3 target = PlayerController.Local.transform.position;
+        PlayerController target = FindCameraTarget();
+        if (target == null)
+        {
+            return;
+        }
+
+        Vector3 focus = target.transform.position;
         float minCamX = BananaRushConfig.ParkourStartX + 2f;
         float maxCamX = BananaRushConfig.ParkourFinishX - 3f;
-        float x = Mathf.Clamp(target.x, minCamX, maxCamX);
-        Vector3 next = new Vector3(x, Mathf.Max(3f, target.y + 2f), -10f);
+        float x = Mathf.Clamp(focus.x, minCamX, maxCamX);
+        Vector3 next = new Vector3(x, Mathf.Max(3f, focus.y + 2f), -10f);
         Camera.main.transform.position = Vector3.Lerp(Camera.main.transform.position, next, 8f * Time.deltaTime);
+    }
+
+    private static PlayerController FindCameraTarget()
+    {
+        PlayerController local = PlayerController.Local;
+        if (local != null && local.IsSpawned && !local.IsEliminated)
+        {
+            return local;
+        }
+
+        PlayerController leader = null;
+        foreach (var player in Object.FindObjectsByType<PlayerController>(FindObjectsSortMode.None))
+        {
+            if (player == null || !player.IsSpawned || player.IsEliminated)
+            {
+                continue;
+            }
+
+            if (leader == null || player.transform.position.x > leader.transform.position.x)
+            {
+                leader = player;
+            }
+        }
+
+        return leader != null ? leader : local;
     }
 
     private static Sprite SpriteFromScene(string objectName)

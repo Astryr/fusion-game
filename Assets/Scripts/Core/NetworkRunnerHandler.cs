@@ -63,6 +63,7 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
     private bool _gameManagerSpawnRequested;
     private NetworkRunner _browseRunner;
     private bool _browsing;
+    private bool _browseStopping;
 
     // Fusion no llama OnInput en el mismo ritmo que Update: si leemos
     // GetKeyDown ahi, el toque de ESPACIO se puede perder entre ticks.
@@ -109,9 +110,16 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         }
         catch (Exception ex)
         {
-            Debug.LogWarning("[NetworkRunnerHandler] No se pudo listar salas: " + ex.Message);
-            OnConnectionFailedEvent?.Invoke("No se pudo entrar al lobby de salas.");
-            StopBrowsing();
+            if (!_browseStopping && !IsBrowseShutdown(ex))
+            {
+                Debug.LogWarning("[NetworkRunnerHandler] No se pudo listar salas: " + ex.Message);
+                OnConnectionFailedEvent?.Invoke("No se pudo entrar al lobby de salas.");
+            }
+
+            if (!IsConnected)
+            {
+                StopBrowsing();
+            }
         }
     }
 
@@ -122,16 +130,27 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
 
     public async Task StopBrowsingAsync()
     {
+        _browseStopping = true;
         _browsing = false;
         if (_browseRunner == null)
         {
+            _browseStopping = false;
             return;
         }
 
         NetworkRunner runner = _browseRunner;
         _browseRunner = null;
         runner.RemoveCallbacks(this);
-        await runner.Shutdown();
+        try
+        {
+            await runner.Shutdown();
+        }
+        catch (Exception)
+        {
+            // Fusion tira ApplicationQuit si el lobby todavia se estaba conectando.
+        }
+
+        _browseStopping = false;
         if (runner != null)
         {
             Destroy(runner.gameObject);
@@ -316,12 +335,15 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
 
     public void OnPlayerJoined(NetworkRunner runner, PlayerRef player)
     {
-        Debug.Log($"[NetworkRunnerHandler] Jugador conectado: {player.PlayerId}");
+        if (!IsGameRunner(runner))
+        {
+            return;
+        }
 
         // En Shared Mode cada cliente hace spawn de SU PROPIO personaje
         // (tiene la autoridad de estado sobre lo que crea), por eso se
         // compara contra runner.LocalPlayer.
-        if (player == runner.LocalPlayer)
+        if (player == runner.LocalPlayer && !_spawnedPlayers.ContainsKey(player))
         {
             if (_playerPrefab != null)
             {
@@ -338,6 +360,11 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
 
     public void OnPlayerLeft(NetworkRunner runner, PlayerRef player)
     {
+        if (!IsGameRunner(runner))
+        {
+            return;
+        }
+
         if (_spawnedPlayers.TryGetValue(player, out NetworkObject playerObject))
         {
             if (playerObject != null && playerObject.HasStateAuthority)
@@ -353,6 +380,11 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
 
     public void OnInput(NetworkRunner runner, NetworkInput input)
     {
+        if (!IsGameRunner(runner))
+        {
+            return;
+        }
+
         var data = new NetworkInputData();
 
         float horizontal = 0f;
@@ -376,7 +408,7 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
 
     public void OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason)
     {
-        if (runner == _browseRunner)
+        if (!IsGameRunner(runner))
         {
             return;
         }
@@ -408,6 +440,10 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
     public void OnUserSimulationMessage(NetworkRunner runner, SimulationMessagePtr message) { }
     public void OnSessionListUpdated(NetworkRunner runner, List<SessionInfo> sessionList)
     {
+        if (runner != _browseRunner && !IsGameRunner(runner))
+        {
+            return;
+        }
         _availableSessions.Clear();
         if (sessionList != null)
         {
@@ -424,4 +460,20 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
     public void OnObjectExitAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
     public void OnObjectEnterAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
     public void OnReliableDataProgress(NetworkRunner runner, PlayerRef player, ReliableKey key, float progress) { }
+
+    private bool IsGameRunner(NetworkRunner runner)
+    {
+        return runner != null && runner == Runner && runner != _browseRunner;
+    }
+
+    private static bool IsBrowseShutdown(Exception ex)
+    {
+        if (ex == null)
+        {
+            return false;
+        }
+
+        string message = ex.ToString();
+        return message.Contains("ApplicationQuit") || message.Contains("DisconnectException");
+    }
 }

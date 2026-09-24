@@ -13,7 +13,7 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
     public const int Rows = 3;
     public const int CellCount = Columns * Rows;
     public const int PairCount = CellCount / 2;
-    public const float PeekSeconds = 3f;
+    public const float PeekSeconds = 10f;
     public const float MismatchSeconds = 0.85f;
 
     private BananaGameManager _director;
@@ -35,6 +35,8 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
     {
         _director = director;
     }
+
+    public void OnCountdownStarted() { }
 
     public void OnMatchStarted()
     {

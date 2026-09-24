@@ -111,6 +111,7 @@ public class GameHUDController : MonoBehaviour
         UpdateChestHud();
         UpdateEndScreen();
         UpdateInfoExtra();
+        UpdateMusic();
     }
 
     private void BuildUI()
@@ -387,9 +388,59 @@ public class GameHUDController : MonoBehaviour
             winner = "Nadie";
         }
 
-        _endScreenText.text = $"{winner.ToUpper()} GANO\nPUNTOS: {manager.WinnerScore}";
+        if (manager.SelectedGame == MiniGameId.Parkour)
+        {
+            _endScreenText.fontSize = 30;
+            _endScreenText.text = BuildParkourResults();
+        }
+        else
+        {
+            _endScreenText.fontSize = 48;
+            _endScreenText.text = $"{winner.ToUpper()} GANO\nPUNTOS: {manager.WinnerScore}";
+        }
+
         bool canReturn = Time.unscaledTime - _endScreenShownAt >= EndScreenHoldSeconds;
         _backToLobbyButton.gameObject.SetActive(canReturn);
+    }
+
+    private static string BuildParkourResults()
+    {
+        var players = Object.FindObjectsByType<PlayerController>(FindObjectsSortMode.None)
+            .Where(p => p != null && p.IsSpawned)
+            .ToArray();
+        var finishers = players
+            .Where(p => !p.IsEliminated)
+            .OrderByDescending(p => p.Score)
+            .ThenByDescending(p => p.transform.position.x)
+            .ToArray();
+        var fallen = players.Where(p => p.IsEliminated).Select(p => p.DisplayName).ToArray();
+
+        var lines = new List<string>();
+        string[] places = { "1er Lugar", "2do lugar", "3er lugar", "4to lugar" };
+        for (int i = 0; i < finishers.Length && i < places.Length; i++)
+        {
+            lines.Add($"{places[i]}: {finishers[i].DisplayName}.");
+        }
+
+        if (fallen.Length > 0)
+        {
+            lines.Add(string.Empty);
+            lines.Add($"Caidos: {string.Join(", ", fallen)}.");
+        }
+
+        return lines.Count > 0 ? string.Join("\n", lines) : "Nadie termino.";
+    }
+
+    private static void UpdateMusic()
+    {
+        var manager = BananaGameManager.Instance;
+        if (manager == null || manager.Phase == MatchPhase.Lobby)
+        {
+            GameAudio.PlayMenu();
+            return;
+        }
+
+        GameAudio.PlayMinigames();
     }
 
     private void UpdateInfoExtra()

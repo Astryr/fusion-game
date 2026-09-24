@@ -33,6 +33,7 @@ public class MainMenuController : MonoBehaviour
         {
             _statusText.color = new Color(0.8f, 0.85f, 0.7f);
             _statusText.text = "Buscando salas...";
+            GameAudio.PlayMenu();
             await handler.StartBrowsingAsync();
         }
     }

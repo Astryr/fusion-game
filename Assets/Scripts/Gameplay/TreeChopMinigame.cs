@@ -29,6 +29,8 @@ public class TreeChopMinigame : MonoBehaviour, IMiniGame
         _director = director;
     }
 
+    public void OnCountdownStarted() { }
+
     public void OnMatchStarted()
     {
         _playing = true;

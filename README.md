@@ -25,17 +25,18 @@ bananas que caen desde arriba antes de que toquen el piso.
   movimiento: **A/D** o flechas, **Espacio** para saltar (o para el golpeo
   de pecho).
 - Minijuegos (GDD, con los sprites que hay):
-  - **Lluvia de bananas**: +5 / explosiva **-10**. Gana quien llega a 100.
+  - **Lluvia de bananas**: +5 / explosiva **-10** / verde rara **+20**.
+    Caen mas y mas rapido con el tiempo. Gana quien llega a 100.
     A los 2:30 arranca un corte de 30s y gana el mejor puntaje.
-  - **Parkour**: carrera larga a la meta, con fondo en parallax. La
-    avalancha es un muro blanco de pantalla completa; si te come, quedas fuera.
+  - **Parkour**: carrera larga. Arrancan quietos en la plataforma, la
+    cuenta atras los suelta. Si te caes, tu camara sigue al que va primero.
   - **Tronco gigante**: el tronco se achica, te pueden empujar, y caen
     cascaras que aturden 3s.
   - **Golpeo de pecho**: spam de Espacio con ritmo. Si el calor llega a
     rojo, perdes.
   - **Memotest 6x3**: cada jugador tiene su propio tablero (9 pares:
     banana, banana bomba, MonikoBoca, Cazador, Cazador azul, banana espada
-    y bananas verde/roja/azul). El primero en completar gana.
+    y bananas verde/roja/azul). 10s para mirar. El primero en completar gana.
   - **Rompe el arbol**: QTE de teclas. Las rojas son trampa. Primero a 30.
 - Al terminar se ve el ganador y **Volver al lobby** para otra ronda.
 

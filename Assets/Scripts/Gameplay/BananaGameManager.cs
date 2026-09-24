@@ -56,9 +56,13 @@ public class BananaGameManager : NetworkBehaviour
 
         _renderedPhase = Phase;
         _renderedGame = SelectedGame;
-        if (Phase == MatchPhase.Playing)
+        _active = FindMinigame(SelectedGame);
+        if (Phase == MatchPhase.Countdown)
         {
-            _active = FindMinigame(SelectedGame);
+            _active?.OnCountdownStarted();
+        }
+        else if (Phase == MatchPhase.Playing)
+        {
             _active?.OnMatchStarted();
         }
     }
@@ -81,7 +85,7 @@ public class BananaGameManager : NetworkBehaviour
             _renderedGame = SelectedGame;
         }
 
-        if (Phase == MatchPhase.Playing)
+        if (Phase == MatchPhase.Playing || Phase == MatchPhase.Countdown)
         {
             _active?.Tick(Time.deltaTime, false);
         }
@@ -470,10 +474,18 @@ public class BananaGameManager : NetworkBehaviour
 
     private void HandlePhaseVisuals(MatchPhase previous, MatchPhase next)
     {
-        if (previous == MatchPhase.Playing)
+        bool leavingPlayArea = previous == MatchPhase.Playing ||
+                               (previous == MatchPhase.Countdown && next != MatchPhase.Playing);
+        if (leavingPlayArea)
         {
             _active?.OnMatchEnded();
             _active?.Cleanup();
+        }
+
+        if (next == MatchPhase.Countdown)
+        {
+            _active = FindMinigame(SelectedGame);
+            _active?.OnCountdownStarted();
         }
 
         if (next == MatchPhase.Playing)

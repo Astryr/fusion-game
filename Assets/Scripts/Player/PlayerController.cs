@@ -349,7 +349,9 @@ public class PlayerController : NetworkBehaviour
 
         int previous = Score;
         Score = Mathf.Max(0, Score + points);
-        Color color = points >= 0 ? new Color(1f, 0.9f, 0.2f) : new Color(1f, 0.35f, 0.25f);
+        Color color = points >= BananaRushConfig.BananaGreenPoints
+            ? new Color(0.35f, 1f, 0.4f)
+            : points >= 0 ? new Color(1f, 0.9f, 0.2f) : new Color(1f, 0.35f, 0.25f);
         string label = points >= 0 ? $"+{points}" : points.ToString();
         GameFeedback.WorldPopup(transform.position + Vector3.up * 1.1f, label, color);
 
