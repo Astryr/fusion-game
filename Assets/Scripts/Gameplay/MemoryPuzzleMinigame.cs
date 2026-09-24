@@ -2,28 +2,33 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Memotest compartido 4x4. Todos ven el mismo tablero; por turnos
-/// cada jugador da vuelta dos fichas. Pareja = 1 punto y sigue jugando.
+/// Memotest local 4x3 (6 pares). Cada jugador ve su propio tablero
+/// mezclado. El primero que complete las 6 parejas gana.
 /// </summary>
 public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
 {
     public MiniGameId Id => MiniGameId.MemoryPuzzle;
 
-    public const int Size = 4;
-    public const int CellCount = Size * Size;
+    public const int Columns = 4;
+    public const int Rows = 3;
+    public const int CellCount = Columns * Rows;
+    public const int PairCount = CellCount / 2;
     public const float PeekSeconds = 3f;
-    public const float MismatchSeconds = 1.15f;
-    public const float TurnTimeout = 18f;
+    public const float MismatchSeconds = 0.85f;
 
     private BananaGameManager _director;
     private Canvas _canvas;
     private Text _status;
     private readonly Image[] _cells = new Image[CellCount];
-    private bool _playing;
+    private readonly int[] _layout = new int[CellCount];
+    private readonly bool[] _locked = new bool[CellCount];
     private Sprite[] _pieceSprites;
-
-    private static int _cachedSeed = int.MinValue;
-    private static readonly int[] Layout = new int[CellCount];
+    private bool _playing;
+    private bool _localFinished;
+    private int _flipA = -1;
+    private int _flipB = -1;
+    private float _mismatchUntil = -1f;
+    private int _pairs;
 
     public void Setup(BananaGameManager director)
     {
@@ -33,19 +38,19 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
     public void OnMatchStarted()
     {
         _playing = true;
+        _localFinished = false;
+        _pairs = 0;
+        _flipA = -1;
+        _flipB = -1;
+        _mismatchUntil = -1f;
         LoadSprites();
-        EnsureLayout(_director.RoundSeed);
+        BuildLayout();
         BuildUI();
         RefreshCells();
 
         foreach (var player in _director.GetPlayers())
         {
             player.SetControlMode(PlayerControlMode.Disabled);
-        }
-
-        if (_director.Object.HasStateAuthority)
-        {
-            _director.ResetPuzzleState();
         }
     }
 
@@ -56,9 +61,23 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
             return;
         }
 
+        if (_mismatchUntil > 0f && Time.unscaledTime >= _mismatchUntil)
+        {
+            _flipA = -1;
+            _flipB = -1;
+            _mismatchUntil = -1f;
+        }
+
         if (hasAuthority)
         {
-            _director.TickPuzzle(PeekSeconds, TurnTimeout);
+            foreach (var player in _director.GetPlayers())
+            {
+                if (player.IsSpawned && player.Score >= PairCount)
+                {
+                    _director.DeclareWinner(player, string.Empty);
+                    return;
+                }
+            }
         }
 
         RefreshCells();
@@ -80,35 +99,23 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
         }
     }
 
-    public static int PieceAt(int seed, int index)
+    private void BuildLayout()
     {
-        EnsureLayout(seed);
-        if (index < 0 || index >= CellCount)
-        {
-            return 0;
-        }
-
-        return Layout[index];
-    }
-
-    private static void EnsureLayout(int seed)
-    {
-        if (_cachedSeed == seed)
-        {
-            return;
-        }
-
-        _cachedSeed = seed;
+        int playerId = PlayerController.Local != null && PlayerController.Local.IsSpawned
+            ? PlayerController.Local.Object.InputAuthority.PlayerId
+            : 0;
+        int seed = _director.RoundSeed + playerId * 31 + 7;
         for (int i = 0; i < CellCount; i++)
         {
-            Layout[i] = (i / 2) % 4;
+            _layout[i] = i / 2;
+            _locked[i] = false;
         }
 
         var rng = new System.Random(seed);
         for (int i = CellCount - 1; i > 0; i--)
         {
             int j = rng.Next(i + 1);
-            (Layout[i], Layout[j]) = (Layout[j], Layout[i]);
+            (_layout[i], _layout[j]) = (_layout[j], _layout[i]);
         }
     }
 
@@ -118,8 +125,10 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
         {
             SpriteFromPrefab("Banana"),
             SpriteFromPrefab("BananaExplosiva"),
-            SpriteFromScene("GrassTop"),
-            SpriteFromScene("DirtFill"),
+            Resources.Load<Sprite>("Memotest/MonikoBoca"),
+            Resources.Load<Sprite>("Memotest/Cazador"),
+            Resources.Load<Sprite>("Memotest/CazadorAzul"),
+            Resources.Load<Sprite>("Memotest/BananaEspada"),
         };
     }
 
@@ -132,29 +141,29 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
 
         _canvas = UIFactory.CreateCanvas("PuzzleCanvas");
         var panel = UIFactory.CreatePanel(_canvas.transform, "PuzzlePanel", new Color(0.08f, 0.09f, 0.12f, 0.82f),
-            new Vector2(0.5f, 0.42f), new Vector2(0.5f, 0.42f), new Vector2(-210, -210), new Vector2(210, 210));
+            new Vector2(0.5f, 0.42f), new Vector2(0.5f, 0.42f), new Vector2(-250, -200), new Vector2(250, 210));
 
         _status = UIFactory.CreateText(panel, "Memotest", 16, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.35f));
         UIFactory.SetRect(_status.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(8, 8), new Vector2(-8, 44));
 
         const float pad = 18f;
-        float cell = (420f - pad * 2f) / Size;
-        for (int y = 0; y < Size; y++)
+        float cellW = (500f - pad * 2f) / Columns;
+        float cellH = (366f - pad * 2f) / Rows;
+        for (int y = 0; y < Rows; y++)
         {
-            for (int x = 0; x < Size; x++)
+            for (int x = 0; x < Columns; x++)
             {
-                int index = y * Size + x;
+                int index = y * Columns + x;
                 var button = UIFactory.CreateButton(panel, string.Empty, new Color(0.18f, 0.2f, 0.24f));
                 var rect = button.GetComponent<RectTransform>();
-                float left = pad + x * cell;
-                float bottom = pad + (Size - 1 - y) * cell;
+                float left = pad + x * cellW;
+                float bottom = pad + (Rows - 1 - y) * cellH;
                 UIFactory.SetRect(rect,
                     new Vector2(0, 0), new Vector2(0, 0),
                     new Vector2(left, bottom),
-                    new Vector2(left + cell - 6f, bottom + cell - 6f));
+                    new Vector2(left + cellW - 8f, bottom + cellH - 8f));
 
-                var image = button.GetComponent<Image>();
-                _cells[index] = image;
+                _cells[index] = button.GetComponent<Image>();
                 int captured = index;
                 button.onClick.AddListener(() => HandleCellClicked(captured));
             }
@@ -163,23 +172,52 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
 
     private void HandleCellClicked(int index)
     {
-        if (!_playing || _director == null || PlayerController.Local == null)
+        if (!_playing || _localFinished || _director == null || _director.MatchTime < PeekSeconds)
         {
             return;
         }
 
-        if (_director.MatchTime < PeekSeconds)
+        if (_mismatchUntil > 0f || _locked[index] || index == _flipA || index == _flipB)
         {
             return;
         }
 
-        if (!_director.IsLocalPuzzleTurn())
+        if (_flipA < 0)
         {
-            GameFeedback.Toast("Todavia no es tu turno", new Color(1f, 0.75f, 0.4f));
+            _flipA = index;
+            RefreshCells();
             return;
         }
 
-        _director.RPC_RequestPuzzleFlip(index, PlayerController.Local.Object.InputAuthority);
+        _flipB = index;
+        if (_layout[_flipA] == _layout[_flipB])
+        {
+            _locked[_flipA] = true;
+            _locked[_flipB] = true;
+            _flipA = -1;
+            _flipB = -1;
+            _pairs++;
+            if (PlayerController.Local != null)
+            {
+                PlayerController.Local.RPC_SetScore(_pairs);
+            }
+
+            if (_pairs >= PairCount)
+            {
+                _localFinished = true;
+                if (PlayerController.Local != null)
+                {
+                    PlayerController.Local.RPC_SetScore(PairCount);
+                    _director.DeclareWinner(PlayerController.Local, string.Empty);
+                }
+            }
+        }
+        else
+        {
+            _mismatchUntil = Time.unscaledTime + MismatchSeconds;
+        }
+
+        RefreshCells();
     }
 
     private void RefreshStatus()
@@ -192,30 +230,14 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
         if (_director.MatchTime < PeekSeconds)
         {
             int left = Mathf.CeilToInt(Mathf.Max(0f, PeekSeconds - _director.MatchTime));
-            _status.text = $"Mira el tablero... {left}";
-            _status.color = new Color(1f, 0.85f, 0.35f);
+            _status.text = $"Mira tu tablero... {left}";
             return;
         }
 
-        if (_director.PuzzleRevealUntil >= 0f && _director.MatchTime < _director.PuzzleRevealUntil)
-        {
-            _status.text = "No era pareja";
-            _status.color = new Color(1f, 0.5f, 0.4f);
-            return;
-        }
-
-        PlayerController turn = _director.FindPlayerById(_director.PuzzleTurnId);
-        string name = turn != null ? turn.DisplayName : "alguien";
-        if (_director.IsLocalPuzzleTurn())
-        {
-            _status.text = "Tu turno: da vuelta 2 fichas iguales";
-            _status.color = new Color(0.55f, 1f, 0.6f);
-        }
-        else
-        {
-            _status.text = $"Turno de {name}";
-            _status.color = new Color(0.85f, 0.86f, 0.9f);
-        }
+        _status.text = _localFinished
+            ? "¡Completaste el memotest!"
+            : $"Parejas {_pairs}/{PairCount}  ·  da vuelta 2 iguales";
+        _status.color = new Color(1f, 0.85f, 0.35f);
     }
 
     private void RefreshCells()
@@ -228,8 +250,7 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
                 continue;
             }
 
-            bool show = peek ||
-                        (_director != null && (_director.IsPuzzleCellLocked(i) || _director.IsPuzzleCellFlipped(i)));
+            bool show = peek || _locked[i] || i == _flipA || i == _flipB;
             if (!show)
             {
                 _cells[i].sprite = null;
@@ -237,7 +258,7 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
                 continue;
             }
 
-            int value = PieceAt(_director.RoundSeed, i);
+            int value = _layout[i];
             if (_pieceSprites == null || value < 0 || value >= _pieceSprites.Length || _pieceSprites[value] == null)
             {
                 _cells[i].sprite = null;
@@ -258,15 +279,11 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
         {
             0 => new Color(1f, 0.85f, 0.2f),
             1 => new Color(1f, 0.35f, 0.25f),
-            2 => new Color(0.35f, 0.7f, 0.3f),
-            _ => new Color(0.45f, 0.3f, 0.2f),
+            2 => new Color(0.85f, 0.55f, 0.25f),
+            3 => new Color(0.95f, 0.35f, 0.3f),
+            4 => new Color(0.35f, 0.55f, 0.95f),
+            _ => new Color(0.95f, 0.9f, 0.35f),
         };
-    }
-
-    private static Sprite SpriteFromScene(string objectName)
-    {
-        GameObject go = GameObject.Find(objectName);
-        return go != null ? go.GetComponent<SpriteRenderer>()?.sprite : null;
     }
 
     private static Sprite SpriteFromPrefab(string resourceName)

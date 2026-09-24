@@ -35,10 +35,17 @@ public class PlayerController : NetworkBehaviour
 
     public static PlayerController Local { get; private set; }
 
+    public bool IsSpawned => Object != null && Object.IsValid;
+
     public string DisplayName
     {
         get
         {
+            if (!IsSpawned)
+            {
+                return "Jugador";
+            }
+
             string name = Nickname.ToString();
             return string.IsNullOrEmpty(name) ? $"Jugador {Object.InputAuthority.PlayerId + 1}" : name;
         }
@@ -126,7 +133,7 @@ public class PlayerController : NetworkBehaviour
     {
         ApplyColor();
         UpdateFacingAndAnimator();
-        if (_nameLabel != null)
+        if (_nameLabel != null && IsSpawned)
         {
             _nameLabel.text = DisplayName;
             _nameLabel.color = IsReady && BananaGameManager.Instance != null && BananaGameManager.Instance.IsInLobby

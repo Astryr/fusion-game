@@ -26,12 +26,7 @@ public class BananaGameManager : NetworkBehaviour
     [Networked] public float AvalancheX { get; set; }
     [Networked] public float LogHalfWidth { get; set; }
     [Networked] public int RoundSeed { get; set; }
-    [Networked] public int PuzzleLockedMask { get; set; }
-    [Networked] public int PuzzleFlipA { get; set; }
-    [Networked] public int PuzzleFlipB { get; set; }
-    [Networked] public int PuzzleTurnId { get; set; }
-    [Networked] public float PuzzleRevealUntil { get; set; }
-    [Networked] public float PuzzleTurnStartedAt { get; set; }
+    [Networked] public int WinnerScore { get; set; }
     [Networked] public NetworkString<_32> WinnerName { get; set; }
     [Networked] public NetworkString<_16> WinnerDetail { get; set; }
 
@@ -54,9 +49,7 @@ public class BananaGameManager : NetworkBehaviour
             Phase = MatchPhase.Lobby;
             CountdownRemaining = -1f;
             OvertimeRemaining = -1f;
-            PuzzleFlipA = -1;
-            PuzzleFlipB = -1;
-            PuzzleRevealUntil = -1f;
+            WinnerScore = 0;
             SelectedGame = ReadSessionMiniGame();
             ApplySelectedGameToSession();
         }
@@ -128,7 +121,27 @@ public class BananaGameManager : NetworkBehaviour
 
     public PlayerController[] GetPlayers()
     {
-        return FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
+        var found = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
+        int count = 0;
+        for (int i = 0; i < found.Length; i++)
+        {
+            if (found[i] != null && found[i].IsSpawned)
+            {
+                count++;
+            }
+        }
+
+        var players = new PlayerController[count];
+        int write = 0;
+        for (int i = 0; i < found.Length; i++)
+        {
+            if (found[i] != null && found[i].IsSpawned)
+            {
+                players[write++] = found[i];
+            }
+        }
+
+        return players;
     }
 
     public int ConnectedPlayerCount()
@@ -154,6 +167,11 @@ public class BananaGameManager : NetworkBehaviour
     {
         var players = GetPlayers();
         if (players.Length < MinPlayersToStart)
+        {
+            return false;
+        }
+
+        if (players.Length < ConnectedPlayerCount())
         {
             return false;
         }
@@ -299,6 +317,7 @@ public class BananaGameManager : NetworkBehaviour
         MatchTime = 0f;
         WinnerName = default;
         WinnerDetail = default;
+        WinnerScore = 0;
         ResetPlayersForLobby();
     }
 
@@ -364,6 +383,7 @@ public class BananaGameManager : NetworkBehaviour
         RoundSeed = Random.Range(1, int.MaxValue);
         WinnerName = default;
         WinnerDetail = default;
+        WinnerScore = 0;
 
         foreach (var player in GetPlayers())
         {
@@ -378,6 +398,13 @@ public class BananaGameManager : NetworkBehaviour
         string name = winner != null ? winner.DisplayName : "Nadie";
         WinnerName = name;
         WinnerDetail = string.IsNullOrEmpty(detail) ? "Ganador" : detail;
+        int score = winner != null ? winner.Score : 0;
+        if (SelectedGame == MiniGameId.MemoryPuzzle)
+        {
+            score = Mathf.Max(score, MemoryPuzzleMinigame.PairCount);
+        }
+
+        WinnerScore = score;
         AwardCupPoints();
         Phase = MatchPhase.Results;
         RPC_ShowFeedback($"{name} gana", 0);
@@ -528,215 +555,6 @@ public class BananaGameManager : NetworkBehaviour
         {
             { MiniGameNames.SessionPropertyKey, (int)SelectedGame },
         });
-    }
-
-    public void ResetPuzzleState()
-    {
-        if (!Object.HasStateAuthority)
-        {
-            return;
-        }
-
-        PuzzleLockedMask = 0;
-        PuzzleFlipA = -1;
-        PuzzleFlipB = -1;
-        PuzzleRevealUntil = -1f;
-        PuzzleTurnStartedAt = 0f;
-        PlayerController first = FindNextPuzzlePlayer(-1);
-        PuzzleTurnId = first != null ? first.Object.InputAuthority.PlayerId : 0;
-    }
-
-    public bool IsPuzzleCellLocked(int index)
-    {
-        return index >= 0 && (PuzzleLockedMask & (1 << index)) != 0;
-    }
-
-    public bool IsPuzzleCellFlipped(int index)
-    {
-        return index == PuzzleFlipA || index == PuzzleFlipB;
-    }
-
-    public bool IsLocalPuzzleTurn()
-    {
-        return PlayerController.Local != null &&
-               PlayerController.Local.Object != null &&
-               PlayerController.Local.Object.InputAuthority.PlayerId == PuzzleTurnId;
-    }
-
-    public PlayerController FindPlayerById(int playerId)
-    {
-        foreach (var player in GetPlayers())
-        {
-            if (player != null && player.Object != null && player.Object.InputAuthority.PlayerId == playerId)
-            {
-                return player;
-            }
-        }
-
-        return null;
-    }
-
-    public void TickPuzzle(float peekSeconds, float turnTimeout)
-    {
-        if (!Object.HasStateAuthority || Phase != MatchPhase.Playing)
-        {
-            return;
-        }
-
-        if (MatchTime < peekSeconds)
-        {
-            return;
-        }
-
-        if (PuzzleTurnStartedAt < peekSeconds)
-        {
-            PuzzleTurnStartedAt = peekSeconds;
-        }
-
-        if (PuzzleRevealUntil >= 0f && MatchTime >= PuzzleRevealUntil)
-        {
-            PuzzleFlipA = -1;
-            PuzzleFlipB = -1;
-            PuzzleRevealUntil = -1f;
-            AdvancePuzzleTurn();
-        }
-
-        if (PuzzleRevealUntil < 0f && MatchTime - PuzzleTurnStartedAt >= turnTimeout)
-        {
-            PuzzleFlipA = -1;
-            PuzzleFlipB = -1;
-            AdvancePuzzleTurn();
-            RPC_ShowFeedback("Turno pasado: se quedo quieto", 2);
-        }
-
-        if (CountLockedPuzzleCells() >= 16)
-        {
-            DeclareHighestScoreWinner("mas parejas");
-            return;
-        }
-
-        if (MatchTime >= 90f)
-        {
-            DeclareHighestScoreWinner("mas parejas al corte");
-        }
-    }
-
-    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-    public void RPC_RequestPuzzleFlip(int index, PlayerRef source)
-    {
-        if (Phase != MatchPhase.Playing || SelectedGame != MiniGameId.MemoryPuzzle)
-        {
-            return;
-        }
-
-        if (index < 0 || index > 15 || MatchTime < MemoryPuzzleMinigame.PeekSeconds)
-        {
-            return;
-        }
-
-        if (PuzzleRevealUntil >= 0f && MatchTime < PuzzleRevealUntil)
-        {
-            return;
-        }
-
-        PlayerController player = FindPlayerById(source.PlayerId);
-        if (player == null || player.IsEliminated || player.Object.InputAuthority.PlayerId != PuzzleTurnId)
-        {
-            return;
-        }
-
-        if (IsPuzzleCellLocked(index) || IsPuzzleCellFlipped(index))
-        {
-            return;
-        }
-
-        if (PuzzleFlipA < 0)
-        {
-            PuzzleFlipA = index;
-            return;
-        }
-
-        if (PuzzleFlipB >= 0)
-        {
-            return;
-        }
-
-        PuzzleFlipB = index;
-        int pieceA = MemoryPuzzleMinigame.PieceAt(RoundSeed, PuzzleFlipA);
-        int pieceB = MemoryPuzzleMinigame.PieceAt(RoundSeed, PuzzleFlipB);
-        if (pieceA == pieceB)
-        {
-            PuzzleLockedMask |= (1 << PuzzleFlipA) | (1 << PuzzleFlipB);
-            PuzzleFlipA = -1;
-            PuzzleFlipB = -1;
-            PuzzleTurnStartedAt = MatchTime;
-            player.RPC_SetScore(player.Score + 1);
-            RPC_ShowFeedback($"{player.DisplayName} encontro pareja", 0);
-            if (CountLockedPuzzleCells() >= 16)
-            {
-                DeclareHighestScoreWinner("mas parejas");
-            }
-        }
-        else
-        {
-            PuzzleRevealUntil = MatchTime + MemoryPuzzleMinigame.MismatchSeconds;
-        }
-    }
-
-    private void AdvancePuzzleTurn()
-    {
-        PlayerController next = FindNextPuzzlePlayer(PuzzleTurnId);
-        if (next != null)
-        {
-            PuzzleTurnId = next.Object.InputAuthority.PlayerId;
-        }
-
-        PuzzleTurnStartedAt = MatchTime;
-    }
-
-    private PlayerController FindNextPuzzlePlayer(int currentId)
-    {
-        PlayerController[] players = GetPlayers();
-        PlayerController first = null;
-        PlayerController after = null;
-        int firstId = int.MaxValue;
-        int afterId = int.MaxValue;
-
-        foreach (var player in players)
-        {
-            if (player == null || player.Object == null || player.IsEliminated)
-            {
-                continue;
-            }
-
-            int id = player.Object.InputAuthority.PlayerId;
-            if (id < firstId)
-            {
-                firstId = id;
-                first = player;
-            }
-
-            if (id > currentId && id < afterId)
-            {
-                afterId = id;
-                after = player;
-            }
-        }
-
-        return after != null ? after : first;
-    }
-
-    private int CountLockedPuzzleCells()
-    {
-        int count = 0;
-        int mask = PuzzleLockedMask;
-        while (mask != 0)
-        {
-            count += mask & 1;
-            mask >>= 1;
-        }
-
-        return count;
     }
 
     private static void RestoreDefaultCamera()

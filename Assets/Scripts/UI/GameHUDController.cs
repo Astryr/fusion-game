@@ -36,6 +36,8 @@ public class GameHUDController : MonoBehaviour
     private GameObject _endScreen;
     private Text _endScreenText;
     private Button _backToLobbyButton;
+    private float _endScreenShownAt = -1f;
+    private const float EndScreenHoldSeconds = 4.5f;
 
     private GameObject _chestPanel;
     private Image _heatFill;
@@ -233,7 +235,7 @@ public class GameHUDController : MonoBehaviour
 
         _backToLobbyButton = UIFactory.CreateButton(_endScreen.transform, "Volver al lobby", new Color(0.24f, 0.5f, 0.85f));
         UIFactory.SetRect(_backToLobbyButton.GetComponent<RectTransform>(),
-            new Vector2(0.5f, 0.2f), new Vector2(0.5f, 0.2f), new Vector2(-140, -24), new Vector2(140, 24));
+            new Vector2(0.5f, 0.12f), new Vector2(0.5f, 0.12f), new Vector2(-140, -24), new Vector2(140, 24));
         _backToLobbyButton.onClick.AddListener(() => BananaGameManager.Instance?.RPC_RequestReturnToLobby());
         _endScreen.SetActive(false);
     }
@@ -266,7 +268,10 @@ public class GameHUDController : MonoBehaviour
 
         _lobbyHint.text = MiniGameNames.Hint(manager.SelectedGame);
 
-        var players = manager.GetPlayers().OrderBy(p => p.Object.InputAuthority.PlayerId).ToArray();
+        var players = manager.GetPlayers()
+            .Where(p => p != null && p.IsSpawned)
+            .OrderBy(p => p.Object.InputAuthority.PlayerId)
+            .ToArray();
         var lines = new List<string>();
         foreach (var player in players)
         {
@@ -362,10 +367,18 @@ public class GameHUDController : MonoBehaviour
     {
         var manager = BananaGameManager.Instance;
         bool show = manager != null && manager.Phase == MatchPhase.Results;
-        _endScreen.SetActive(show);
         if (!show)
         {
+            _endScreenShownAt = -1f;
+            _endScreen.SetActive(false);
             return;
+        }
+
+        _endScreen.SetActive(true);
+
+        if (_endScreenShownAt < 0f)
+        {
+            _endScreenShownAt = Time.unscaledTime;
         }
 
         string winner = manager.WinnerName.ToString();
@@ -374,24 +387,9 @@ public class GameHUDController : MonoBehaviour
             winner = "Nadie";
         }
 
-        string detail = manager.WinnerDetail.ToString();
-        string cup = BuildCupStandings();
-        _endScreenText.text = string.IsNullOrEmpty(detail)
-            ? $"¡{winner} gana!\n{cup}"
-            : $"¡{winner} gana!\n{detail}\n{cup}";
-    }
-
-    private static string BuildCupStandings()
-    {
-        var players = FindObjectsByType<PlayerController>(FindObjectsSortMode.None)
-            .OrderByDescending(p => p.CupScore)
-            .ToArray();
-        if (players.Length == 0)
-        {
-            return string.Empty;
-        }
-
-        return "Copa Banana: " + string.Join("  ·  ", players.Select(p => $"{p.DisplayName} {p.CupScore}"));
+        _endScreenText.text = $"{winner.ToUpper()} GANO\nPUNTOS: {manager.WinnerScore}";
+        bool canReturn = Time.unscaledTime - _endScreenShownAt >= EndScreenHoldSeconds;
+        _backToLobbyButton.gameObject.SetActive(canReturn);
     }
 
     private void UpdateInfoExtra()
@@ -422,7 +420,9 @@ public class GameHUDController : MonoBehaviour
             return;
         }
 
-        bool hideForLobby = BananaGameManager.Instance != null && BananaGameManager.Instance.Phase == MatchPhase.Lobby;
+        bool hideForLobby = BananaGameManager.Instance != null &&
+                            (BananaGameManager.Instance.Phase == MatchPhase.Lobby ||
+                             BananaGameManager.Instance.Phase == MatchPhase.Results);
         if (_scoreboardPanel != null)
         {
             _scoreboardPanel.SetActive(!hideForLobby);
@@ -434,6 +434,7 @@ public class GameHUDController : MonoBehaviour
         }
 
         var players = FindObjectsByType<PlayerController>(FindObjectsSortMode.None)
+            .Where(p => p != null && p.IsSpawned)
             .OrderByDescending(p => p.Score)
             .ToList();
 
