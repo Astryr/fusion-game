@@ -61,4 +61,16 @@ public static class BananaRushConfig
 
     /// <summary>Limite horizontal de aparicion de bananas (tambien atado a la pantalla, no al piso).</summary>
     public const float BananaSpawnX = ScreenHalfWidth - BananaSpawnMargin;
+
+    public const int BananaTargetScore = 100;
+    public const int BananaNormalPoints = 5;
+    public const int BananaExplosivePoints = -10;
+    public const float BananaRegularDuration = 150f;
+    public const float BananaOvertimeDuration = 30f;
+
+    public const float ParkourStartX = -4f;
+    public const float ParkourFinishX = 38f;
+    public const float ParkourMinX = -8f;
+    public const float ParkourMaxX = 42f;
+    public const float ParkourAvalancheSpeed = 3.2f;
 }

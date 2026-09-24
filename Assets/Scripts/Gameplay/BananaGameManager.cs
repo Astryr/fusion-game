@@ -1,186 +1,455 @@
+using System.Collections.Generic;
 using Fusion;
 using UnityEngine;
 
 /// <summary>
-/// Autoridad de la partida en Shared Mode. La spawnea unicamente el Master
-/// Client (ver <see cref="NetworkRunnerHandler"/>) con el flag
-/// <c>SharedModeStateAuthMasterClient</c>, asi que si ese jugador se
-/// desconecta la autoridad de este objeto pasa sola al nuevo Master Client
-/// (no hace falta re-spawnearlo).
-///
-/// Responsabilidades:
-///  - Esperar a que haya suficientes jugadores y hacer una cuenta regresiva
-///    antes de arrancar (<see cref="MatchStarted"/>).
-///  - Hacer llover bananas (normales y explosivas) desde arriba del mapa a
-///    intervalos al azar, una vez arrancada la partida.
-///  - Vigilar el puntaje de todos los jugadores y declarar un ganador.
-///
-/// Todo el estado que le importa a la UI (<see cref="MatchStarted"/>,
-/// <see cref="CountdownRemaining"/>, <see cref="IsGameOver"/>,
-/// <see cref="WinnerName"/>) es <c>[Networked]</c>, asi que cualquier
-/// cliente puede mostrarlo mirando el mismo estado sin necesitar RPCs.
+/// Director de la sala en Shared Mode: lobby + ready check + minijuego
+/// elegido + resultados. Lo spawnea el Master Client. El estado de fase,
+/// minijuego y temporizadores es [Networked]; el ready de cada mono vive
+/// en <see cref="PlayerController.IsReady"/>.
 /// </summary>
 public class BananaGameManager : NetworkBehaviour
 {
     public static BananaGameManager Instance { get; private set; }
 
-    [Header("Arranque de la partida")]
-    [Tooltip("Cantidad minima de jugadores conectados para arrancar la cuenta regresiva.")]
-    [SerializeField] private int _minPlayersToStart = 2;
-    [Tooltip("Segundos de cuenta regresiva una vez que hay suficientes jugadores.")]
     [SerializeField] private float _countdownDuration = 5f;
 
-    [Header("Puntaje para ganar")]
-    [SerializeField] private int _targetScore = 100;
+    public int MinPlayersToStart => MiniGameNames.MinPlayersToStart;
 
-    [Header("Prefabs (deben vivir en una carpeta Resources)")]
-    [SerializeField] private string _bananaPrefabName = "Banana";
-    [SerializeField] private string _bananaExplosivaPrefabName = "BananaExplosiva";
-
-    [Header("Ritmo de aparicion")]
-    [SerializeField] private float _minSpawnInterval = 0.8f;
-    [SerializeField] private float _maxSpawnInterval = 1.5f;
-    [SerializeField] private float _minFallSpeed = 2.8f;
-    [SerializeField] private float _maxFallSpeed = 3.8f;
-    [SerializeField, Range(0f, 1f)] private float _explosiveChance = 0.25f;
-
-    /// <summary>Cantidad de jugadores necesarios para arrancar la cuenta regresiva.</summary>
-    public int MinPlayersToStart => _minPlayersToStart;
-
-    /// <summary>True una vez que termino la cuenta regresiva y ya llueven bananas.</summary>
-    [Networked] public NetworkBool MatchStarted { get; set; }
-
-    /// <summary>
-    /// Segundos restantes de cuenta regresiva. Negativo mientras se espera a
-    /// que se sumen suficientes jugadores (todavia no arranco la cuenta).
-    /// </summary>
+    [Networked] public MatchPhase Phase { get; set; }
+    [Networked] public MiniGameId SelectedGame { get; set; }
     [Networked] public float CountdownRemaining { get; set; }
-
-    [Networked] public NetworkBool IsGameOver { get; set; }
+    [Networked] public float MatchTime { get; set; }
+    [Networked] public float OvertimeRemaining { get; set; }
+    [Networked] public float AvalancheX { get; set; }
+    [Networked] public float LogHalfWidth { get; set; }
+    [Networked] public int RoundSeed { get; set; }
     [Networked] public NetworkString<_32> WinnerName { get; set; }
+    [Networked] public NetworkString<_16> WinnerDetail { get; set; }
 
-    private NetworkObject _bananaPrefab;
-    private NetworkObject _bananaExplosivaPrefab;
-    private float _spawnTimer;
+    public bool MatchStarted => Phase == MatchPhase.Playing;
+    public bool IsGameOver => Phase == MatchPhase.Results;
+    public bool IsInLobby => Phase == MatchPhase.Lobby;
+
+    private readonly List<IMiniGame> _minigames = new List<IMiniGame>();
+    private IMiniGame _active;
+    private MatchPhase _renderedPhase = (MatchPhase)(-1);
+    private MiniGameId _renderedGame;
 
     public override void Spawned()
     {
         Instance = this;
-        _bananaPrefab = Resources.Load<NetworkObject>(_bananaPrefabName);
-        _bananaExplosivaPrefab = Resources.Load<NetworkObject>(_bananaExplosivaPrefabName);
-
-        if (_bananaPrefab == null || _bananaExplosivaPrefab == null)
-        {
-            Debug.LogError("[BananaGameManager] Faltan los prefabs de banana en Resources.");
-        }
+        BuildMinigames();
 
         if (Object.HasStateAuthority)
         {
+            Phase = MatchPhase.Lobby;
             CountdownRemaining = -1f;
+            OvertimeRemaining = -1f;
+            SelectedGame = ReadSessionMiniGame();
+            ApplySelectedGameToSession();
         }
 
-        _spawnTimer = _minSpawnInterval;
+        _renderedPhase = Phase;
+        _renderedGame = SelectedGame;
     }
 
     public override void Despawned(NetworkRunner runner, bool hasState)
     {
+        _active?.Cleanup();
         if (Instance == this)
         {
             Instance = null;
         }
     }
 
-    public override void FixedUpdateNetwork()
+    public override void Render()
     {
-        // Solo quien tiene la autoridad (el Master Client) hace correr la
-        // logica de la partida; en el resto de los clientes este objeto es
-        // un proxy de solo lectura (las propiedades ya vienen replicadas).
-        if (!Object.HasStateAuthority || IsGameOver)
+        if (_renderedPhase != Phase || _renderedGame != SelectedGame)
         {
-            return;
+            HandlePhaseVisuals(_renderedPhase, Phase);
+            _renderedPhase = Phase;
+            _renderedGame = SelectedGame;
         }
 
-        if (!MatchStarted)
+        if (Phase == MatchPhase.Playing)
         {
-            UpdateWaitingAndCountdown();
-            return;
-        }
-
-        CheckForWinner();
-        if (IsGameOver)
-        {
-            return;
-        }
-
-        _spawnTimer -= Runner.DeltaTime;
-        if (_spawnTimer <= 0f)
-        {
-            SpawnBanana();
-            _spawnTimer = Random.Range(_minSpawnInterval, _maxSpawnInterval);
+            _active?.Tick(Time.deltaTime, false);
         }
     }
 
-    /// <summary>
-    /// Nadie arranca a jugar (ni caen bananas) hasta que haya al menos
-    /// <see cref="_minPlayersToStart"/> jugadores en la sala. Ahi arranca una
-    /// cuenta regresiva para darle tiempo a todos de prepararse; si alguien
-    /// se va durante la cuenta y vuelve a faltar gente, se cancela sola.
-    /// </summary>
-    private void UpdateWaitingAndCountdown()
+    public override void FixedUpdateNetwork()
     {
-        int playerCount = Runner.SessionInfo != null ? Runner.SessionInfo.PlayerCount : 0;
+        if (!Object.HasStateAuthority)
+        {
+            return;
+        }
 
-        if (playerCount < _minPlayersToStart)
+        if (Phase == MatchPhase.Lobby)
+        {
+            UpdateLobby();
+            return;
+        }
+
+        if (Phase == MatchPhase.Countdown)
+        {
+            UpdateCountdown();
+            return;
+        }
+
+        if (Phase == MatchPhase.Playing)
+        {
+            MatchTime += Runner.DeltaTime;
+            _active?.Tick(Runner.DeltaTime, true);
+        }
+    }
+
+    public PlayerController[] GetPlayers()
+    {
+        return FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
+    }
+
+    public int ConnectedPlayerCount()
+    {
+        return Runner != null && Runner.SessionInfo != null ? Runner.SessionInfo.PlayerCount : 0;
+    }
+
+    public int ReadyCount()
+    {
+        int ready = 0;
+        foreach (var player in GetPlayers())
+        {
+            if (player.IsReady)
+            {
+                ready++;
+            }
+        }
+
+        return ready;
+    }
+
+    public bool EveryoneReady()
+    {
+        var players = GetPlayers();
+        if (players.Length < MiniGameNames.MinPlayersToStart)
+        {
+            return false;
+        }
+
+        foreach (var player in players)
+        {
+            if (!player.IsReady)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public void SetSelectedGame(MiniGameId id)
+    {
+        if (!Object.HasStateAuthority || Phase != MatchPhase.Lobby)
+        {
+            return;
+        }
+
+        SelectedGame = MiniGameNames.Clamp((int)id);
+        ApplySelectedGameToSession();
+        UnreadyEveryone();
+        RPC_ShowFeedback($"Minijuego: {MiniGameNames.Display(SelectedGame)}", 1);
+    }
+
+    public void DeclareWinner(PlayerController winner, string detail)
+    {
+        if (Phase != MatchPhase.Playing || winner == null)
+        {
+            return;
+        }
+
+        if (Object.HasStateAuthority)
+        {
+            FinishMatch(winner, detail);
+            return;
+        }
+
+        RPC_DeclareWinner(winner.Object.InputAuthority, detail);
+    }
+
+    public void DeclareHighestScoreWinner(string detail)
+    {
+        if (Phase != MatchPhase.Playing)
+        {
+            return;
+        }
+
+        if (Object.HasStateAuthority)
+        {
+            FinishMatch(FindHighestScore(), detail);
+            return;
+        }
+
+        RPC_DeclareHighestScore(detail);
+    }
+
+    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+    public void RPC_DeclareWinner(PlayerRef player, string detail)
+    {
+        if (Phase != MatchPhase.Playing)
+        {
+            return;
+        }
+
+        PlayerController winner = null;
+        foreach (var candidate in GetPlayers())
+        {
+            if (candidate.Object.InputAuthority == player)
+            {
+                winner = candidate;
+                break;
+            }
+        }
+
+        FinishMatch(winner, detail);
+    }
+
+    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+    public void RPC_DeclareHighestScore(string detail)
+    {
+        if (Phase == MatchPhase.Playing)
+        {
+            FinishMatch(FindHighestScore(), detail);
+        }
+    }
+
+    private PlayerController FindHighestScore()
+    {
+        PlayerController best = null;
+        foreach (var player in GetPlayers())
+        {
+            if (player.IsEliminated)
+            {
+                continue;
+            }
+
+            if (best == null || player.Score > best.Score)
+            {
+                best = player;
+            }
+        }
+
+        return best;
+    }
+
+    public void ReturnToLobby()
+    {
+        if (!Object.HasStateAuthority)
+        {
+            return;
+        }
+
+        Phase = MatchPhase.Lobby;
+        CountdownRemaining = -1f;
+        OvertimeRemaining = -1f;
+        MatchTime = 0f;
+        WinnerName = default;
+        WinnerDetail = default;
+        ResetPlayersForLobby();
+    }
+
+    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+    public void RPC_RequestReturnToLobby()
+    {
+        if (Phase == MatchPhase.Results)
+        {
+            ReturnToLobby();
+        }
+    }
+
+    [Rpc(RpcSources.All, RpcTargets.All)]
+    public void RPC_ShowFeedback(NetworkString<_64> message, int tone)
+    {
+        Color color = tone switch
+        {
+            0 => new Color(0.55f, 1f, 0.60f),
+            2 => new Color(1f, 0.45f, 0.40f),
+            _ => new Color(1f, 0.85f, 0.35f),
+        };
+        GameFeedback.Toast(message.ToString(), color);
+    }
+
+    private void UpdateLobby()
+    {
+        if (!EveryoneReady())
         {
             CountdownRemaining = -1f;
             return;
         }
 
-        if (CountdownRemaining < 0f)
+        Phase = MatchPhase.Countdown;
+        CountdownRemaining = _countdownDuration;
+        RPC_ShowFeedback("Todos listos. Arranca el conteo...", 1);
+    }
+
+    private void UpdateCountdown()
+    {
+        if (!EveryoneReady() || ConnectedPlayerCount() < MiniGameNames.MinPlayersToStart)
         {
-            CountdownRemaining = _countdownDuration;
+            Phase = MatchPhase.Lobby;
+            CountdownRemaining = -1f;
+            RPC_ShowFeedback("Se cancelo el conteo", 2);
             return;
         }
 
         CountdownRemaining -= Runner.DeltaTime;
-        if (CountdownRemaining <= 0f)
-        {
-            CountdownRemaining = 0f;
-            MatchStarted = true;
-        }
-    }
-
-    private void CheckForWinner()
-    {
-        var players = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
-        foreach (var player in players)
-        {
-            if (player.Score >= _targetScore)
-            {
-                IsGameOver = true;
-                WinnerName = player.Nickname;
-                return;
-            }
-        }
-    }
-
-    private void SpawnBanana()
-    {
-        bool explosive = Random.value < _explosiveChance;
-        NetworkObject prefab = explosive ? _bananaExplosivaPrefab : _bananaPrefab;
-        if (prefab == null)
+        if (CountdownRemaining > 0f)
         {
             return;
         }
 
-        float x = Random.Range(-BananaRushConfig.BananaSpawnX, BananaRushConfig.BananaSpawnX);
-        Vector3 position = new Vector3(x, BananaRushConfig.BananaSpawnY, 0f);
-        float fallSpeed = Random.Range(_minFallSpeed, _maxFallSpeed);
+        BeginMatch();
+    }
 
-        NetworkObject spawned = Runner.Spawn(prefab, position, Quaternion.identity);
-        if (spawned != null && spawned.TryGetComponent(out BananaController banana))
+    private void BeginMatch()
+    {
+        Phase = MatchPhase.Playing;
+        CountdownRemaining = 0f;
+        MatchTime = 0f;
+        OvertimeRemaining = -1f;
+        RoundSeed = Random.Range(1, int.MaxValue);
+        WinnerName = default;
+        WinnerDetail = default;
+
+        foreach (var player in GetPlayers())
         {
-            banana.Configure(fallSpeed);
+            player.PrepareForMatch(SelectedGame);
         }
+
+        RPC_ShowFeedback($"¡{MiniGameNames.Display(SelectedGame)}!", 1);
+    }
+
+    private void FinishMatch(PlayerController winner, string detail)
+    {
+        string name = winner != null ? winner.DisplayName : "Nadie";
+        WinnerName = name;
+        WinnerDetail = string.IsNullOrEmpty(detail) ? "Ganador" : detail;
+        Phase = MatchPhase.Results;
+        RPC_ShowFeedback($"{name} gana", 0);
+    }
+
+    private void ResetPlayersForLobby()
+    {
+        foreach (var player in GetPlayers())
+        {
+            player.ResetForLobby();
+        }
+    }
+
+    private void UnreadyEveryone()
+    {
+        foreach (var player in GetPlayers())
+        {
+            player.ForceUnready();
+        }
+    }
+
+    private void HandlePhaseVisuals(MatchPhase previous, MatchPhase next)
+    {
+        if (previous == MatchPhase.Playing)
+        {
+            _active?.OnMatchEnded();
+            _active?.Cleanup();
+        }
+
+        if (next == MatchPhase.Playing)
+        {
+            _active = FindMinigame(SelectedGame);
+            _active?.OnMatchStarted();
+        }
+
+        if (next == MatchPhase.Lobby)
+        {
+            RestoreDefaultCamera();
+            foreach (var player in GetPlayers())
+            {
+                player.SetControlMode(PlayerControlMode.Platformer);
+                player.SetWorldBounds(-BananaRushConfig.PlayerClampX, BananaRushConfig.PlayerClampX, BananaRushConfig.GroundTopY, -8f);
+                player.SetPushEnabled(false);
+            }
+        }
+    }
+
+    private void BuildMinigames()
+    {
+        _minigames.Clear();
+        _minigames.Add(GetOrAdd<BananaRainMinigame>());
+        _minigames.Add(GetOrAdd<ParkourMinigame>());
+        _minigames.Add(GetOrAdd<LogSurviveMinigame>());
+        _minigames.Add(GetOrAdd<ChestBeatMinigame>());
+        _minigames.Add(GetOrAdd<MemoryPuzzleMinigame>());
+        _minigames.Add(GetOrAdd<TreeChopMinigame>());
+
+        foreach (var minigame in _minigames)
+        {
+            minigame.Setup(this);
+        }
+    }
+
+    private T GetOrAdd<T>() where T : MonoBehaviour, IMiniGame
+    {
+        T existing = GetComponent<T>();
+        return existing != null ? existing : gameObject.AddComponent<T>();
+    }
+
+    private IMiniGame FindMinigame(MiniGameId id)
+    {
+        foreach (var minigame in _minigames)
+        {
+            if (minigame.Id == id)
+            {
+                return minigame;
+            }
+        }
+
+        return _minigames.Count > 0 ? _minigames[0] : null;
+    }
+
+    private MiniGameId ReadSessionMiniGame()
+    {
+        if (Runner.SessionInfo != null &&
+            Runner.SessionInfo.Properties != null &&
+            Runner.SessionInfo.Properties.TryGetValue(MiniGameNames.SessionPropertyKey, out SessionProperty value))
+        {
+            return MiniGameNames.Clamp((int)value);
+        }
+
+        return NetworkRunnerHandler.Instance != null
+            ? NetworkRunnerHandler.Instance.PendingMiniGame
+            : MiniGameId.BananaRain;
+    }
+
+    private void ApplySelectedGameToSession()
+    {
+        if (Runner.SessionInfo == null)
+        {
+            return;
+        }
+
+        Runner.SessionInfo.UpdateCustomProperties(new Dictionary<string, SessionProperty>
+        {
+            { MiniGameNames.SessionPropertyKey, (int)SelectedGame },
+        });
+    }
+
+    private static void RestoreDefaultCamera()
+    {
+        Camera cam = Camera.main;
+        if (cam == null)
+        {
+            return;
+        }
+
+        cam.orthographicSize = BananaRushConfig.CameraOrthographicSize;
+        cam.transform.position = new Vector3(0f, BananaRushConfig.CameraCenterY, -10f);
     }
 }

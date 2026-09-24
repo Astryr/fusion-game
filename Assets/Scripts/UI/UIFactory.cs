@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -140,6 +141,70 @@ public static class UIFactory
         CreateText(go.transform, label, 22, TextAnchor.MiddleCenter, Color.white);
 
         return button;
+    }
+
+    public static Dropdown CreateDropdown(Transform parent, IList<string> options, int selectedIndex = 0)
+    {
+        var go = new GameObject("Dropdown", typeof(Image), typeof(Dropdown));
+        go.transform.SetParent(parent, false);
+        go.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.95f);
+
+        var label = CreateText(go.transform, options.Count > 0 ? options[0] : string.Empty, 16, TextAnchor.MiddleLeft, new Color(0.1f, 0.1f, 0.1f));
+        SetRect(label.rectTransform, Vector2.zero, Vector2.one, new Vector2(10, 4), new Vector2(-28, -4));
+
+        var arrow = CreateText(go.transform, "▼", 12, TextAnchor.MiddleCenter, new Color(0.2f, 0.2f, 0.2f));
+        SetRect(arrow.rectTransform, new Vector2(1, 0), new Vector2(1, 1), new Vector2(-26, 0), new Vector2(-4, 0));
+
+        var template = new GameObject("Template", typeof(Image), typeof(ScrollRect));
+        template.transform.SetParent(go.transform, false);
+        template.GetComponent<Image>().color = new Color(0.95f, 0.95f, 0.95f, 1f);
+        var templateRect = template.GetComponent<RectTransform>();
+        SetRect(templateRect, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, -140), new Vector2(0, 0));
+        template.SetActive(false);
+
+        var viewport = new GameObject("Viewport", typeof(Image), typeof(Mask));
+        viewport.transform.SetParent(template.transform, false);
+        viewport.GetComponent<Image>().color = Color.white;
+        viewport.GetComponent<Mask>().showMaskGraphic = false;
+        var viewportRect = viewport.GetComponent<RectTransform>();
+        SetRect(viewportRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+        var content = new GameObject("Content", typeof(RectTransform));
+        content.transform.SetParent(viewport.transform, false);
+        var contentRect = content.GetComponent<RectTransform>();
+        contentRect.anchorMin = new Vector2(0, 1);
+        contentRect.anchorMax = new Vector2(1, 1);
+        contentRect.pivot = new Vector2(0.5f, 1f);
+        contentRect.sizeDelta = new Vector2(0, 32);
+
+        var item = new GameObject("Item", typeof(Toggle));
+        item.transform.SetParent(content.transform, false);
+        var itemRect = item.AddComponent<RectTransform>();
+        itemRect.anchorMin = new Vector2(0, 0.5f);
+        itemRect.anchorMax = new Vector2(1, 0.5f);
+        itemRect.sizeDelta = new Vector2(0, 28);
+
+        var itemBg = item.AddComponent<Image>();
+        itemBg.color = new Color(0.9f, 0.9f, 0.9f, 1f);
+        var toggle = item.GetComponent<Toggle>();
+        toggle.targetGraphic = itemBg;
+
+        var itemLabel = CreateText(item.transform, "Opcion", 15, TextAnchor.MiddleLeft, new Color(0.1f, 0.1f, 0.1f));
+        SetRect(itemLabel.rectTransform, Vector2.zero, Vector2.one, new Vector2(8, 0), new Vector2(-8, 0));
+
+        var dropdown = go.GetComponent<Dropdown>();
+        dropdown.captionText = label;
+        dropdown.itemText = itemLabel;
+        dropdown.template = templateRect;
+        dropdown.options.Clear();
+        foreach (string option in options)
+        {
+            dropdown.options.Add(new Dropdown.OptionData(option));
+        }
+
+        dropdown.value = Mathf.Clamp(selectedIndex, 0, Mathf.Max(0, options.Count - 1));
+        dropdown.RefreshShownValue();
+        return dropdown;
     }
 
     public static InputField CreateInputField(Transform parent, string placeholder)

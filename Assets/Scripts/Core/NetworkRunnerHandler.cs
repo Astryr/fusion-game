@@ -41,6 +41,8 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
     public NetworkRunner Runner { get; private set; }
     public bool IsConnected { get; private set; }
     public string CurrentSessionName { get; private set; }
+    public MiniGameId PendingMiniGame { get; private set; } = MiniGameId.BananaRain;
+    public IReadOnlyList<SessionInfo> AvailableSessions => _availableSessions;
 
     /// <summary>Nombre elegido en el menu antes de conectarse. Lo lee <see cref="PlayerController.Spawned"/>.</summary>
     public string LocalNickname { get; private set; }
@@ -50,15 +52,20 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
     public event Action<string> OnConnectionFailedEvent;
     public event Action OnDisconnectedEvent;
     public event Action<int> OnPlayerCountChangedEvent;
+    public event Action<List<SessionInfo>> OnSessionListUpdatedEvent;
 
     private readonly Dictionary<PlayerRef, NetworkObject> _spawnedPlayers = new Dictionary<PlayerRef, NetworkObject>();
+    private readonly List<SessionInfo> _availableSessions = new List<SessionInfo>();
     private NetworkObject _playerPrefab;
     private NetworkObject _gameManagerPrefab;
     private bool _gameManagerSpawnRequested;
+    private NetworkRunner _browseRunner;
+    private bool _browsing;
 
     // Fusion no llama OnInput en el mismo ritmo que Update: si leemos
     // GetKeyDown ahi, el toque de ESPACIO se puede perder entre ticks.
     private bool _jumpQueued;
+    private bool _actionQueued;
 
     private void Awake()
     {
@@ -77,15 +84,83 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         if (Input.GetKeyDown(KeyCode.Space))
         {
             _jumpQueued = true;
+            _actionQueued = true;
         }
+    }
+
+    public async Task StartBrowsingAsync()
+    {
+        if (_browsing || IsConnected)
+        {
+            return;
+        }
+
+        _browsing = true;
+        var host = new GameObject("BrowseRunner");
+        host.transform.SetParent(transform, false);
+        _browseRunner = host.AddComponent<NetworkRunner>();
+        _browseRunner.AddCallbacks(this);
+
+        try
+        {
+            await _browseRunner.JoinSessionLobby(SessionLobby.Shared);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[NetworkRunnerHandler] No se pudo listar salas: " + ex.Message);
+            OnConnectionFailedEvent?.Invoke("No se pudo entrar al lobby de salas.");
+            StopBrowsing();
+        }
+    }
+
+    public void StopBrowsing()
+    {
+        _ = StopBrowsingAsync();
+    }
+
+    public async Task StopBrowsingAsync()
+    {
+        _browsing = false;
+        if (_browseRunner == null)
+        {
+            return;
+        }
+
+        NetworkRunner runner = _browseRunner;
+        _browseRunner = null;
+        runner.RemoveCallbacks(this);
+        await runner.Shutdown();
+        if (runner != null)
+        {
+            Destroy(runner.gameObject);
+        }
+    }
+
+    public Task<bool> CreateSessionAsync(string sessionName, string nickname, MiniGameId miniGame)
+    {
+        if (string.IsNullOrWhiteSpace(sessionName))
+        {
+            sessionName = "Sala" + UnityEngine.Random.Range(1000, 9999);
+        }
+
+        PendingMiniGame = miniGame;
+        return ConnectInternalAsync(sessionName.Trim(), nickname, createIfMissing: true, miniGame);
+    }
+
+    public Task<bool> JoinSessionAsync(string sessionName, string nickname)
+    {
+        return ConnectInternalAsync(sessionName, nickname, createIfMissing: false, MiniGameId.BananaRain);
     }
 
     /// <summary>
     /// Crea (si no existe) o une a la sesion Shared con el nombre indicado.
-    /// Al ser Shared Mode, no hay distincion real entre "host" y "cliente":
-    /// el primero en usar ese nombre de sala la crea, el resto se une.
     /// </summary>
-    public async Task<bool> ConnectAsync(string sessionName, string nickname)
+    public Task<bool> ConnectAsync(string sessionName, string nickname)
+    {
+        return CreateSessionAsync(sessionName, nickname, PendingMiniGame);
+    }
+
+    private async Task<bool> ConnectInternalAsync(string sessionName, string nickname, bool createIfMissing, MiniGameId miniGame)
     {
         if (Runner != null)
         {
@@ -93,8 +168,11 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
             return false;
         }
 
+        await StopBrowsingAsync();
+
         sessionName = string.IsNullOrWhiteSpace(sessionName) ? _defaultSessionName : sessionName.Trim();
         LocalNickname = string.IsNullOrWhiteSpace(nickname) ? _defaultNickname : nickname.Trim();
+        PendingMiniGame = miniGame;
 
         OnConnectingEvent?.Invoke();
 
@@ -124,24 +202,34 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
             sceneInfo.AddSceneRef(sceneRef, LoadSceneMode.Single);
         }
 
+        var properties = new Dictionary<string, SessionProperty>
+        {
+            { MiniGameNames.SessionPropertyKey, (int)miniGame },
+        };
+
         StartGameResult result = await Runner.StartGame(new StartGameArgs
         {
             GameMode = GameMode.Shared,
             SessionName = sessionName,
+            PlayerCount = MiniGameNames.MaxPlayers,
+            IsVisible = true,
+            IsOpen = true,
+            EnableClientSessionCreation = createIfMissing,
+            SessionProperties = properties,
             Scene = sceneInfo,
             SceneManager = gameObject.AddComponent<NetworkSceneManagerDefault>(),
         });
 
         if (result.Ok)
         {
-            CurrentSessionName = sessionName;
+            CurrentSessionName = Runner.SessionInfo != null ? Runner.SessionInfo.Name : sessionName;
             IsConnected = true;
             OnConnectedEvent?.Invoke();
             return true;
         }
 
         Debug.LogError($"[NetworkRunnerHandler] Fallo la conexion: {result.ShutdownReason}");
-        OnConnectionFailedEvent?.Invoke(result.ShutdownReason.ToString());
+        OnConnectionFailedEvent?.Invoke(HumanizeShutdown(result.ShutdownReason));
 
         if (Runner != null)
         {
@@ -150,6 +238,17 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         }
 
         return false;
+    }
+
+    private static string HumanizeShutdown(ShutdownReason reason)
+    {
+        return reason switch
+        {
+            ShutdownReason.GameIsFull => "La sala esta llena (maximo 4).",
+            ShutdownReason.GameNotFound => "No se encontro esa sala.",
+            ShutdownReason.DisconnectedByPluginLogic => "Photon corto la conexion.",
+            _ => reason.ToString(),
+        };
     }
 
     /// <summary>Corta la conexion actual (boton "Salir" del HUD).</summary>
@@ -249,9 +348,14 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
 
         // Salto: solo ESPACIO (nada de W ni flecha arriba). El buffer se
         // consume aca para no perder el toque si Fusion poll-ea en otro frame.
-        data.Horizontal = horizontal;
-        data.JumpPressed = _jumpQueued;
+        var buttons = default(NetworkButtons);
+        buttons.Set(InputButton.Jump, _jumpQueued);
+        buttons.Set(InputButton.Action, _actionQueued);
         _jumpQueued = false;
+        _actionQueued = false;
+
+        data.Horizontal = horizontal;
+        data.Buttons = buttons;
         input.Set(data);
     }
 
@@ -259,6 +363,11 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
 
     public void OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason)
     {
+        if (runner == _browseRunner)
+        {
+            return;
+        }
+
         IsConnected = false;
         CurrentSessionName = null;
         _spawnedPlayers.Clear();
@@ -275,7 +384,16 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
     }
 
     public void OnUserSimulationMessage(NetworkRunner runner, SimulationMessagePtr message) { }
-    public void OnSessionListUpdated(NetworkRunner runner, List<SessionInfo> sessionList) { }
+    public void OnSessionListUpdated(NetworkRunner runner, List<SessionInfo> sessionList)
+    {
+        _availableSessions.Clear();
+        if (sessionList != null)
+        {
+            _availableSessions.AddRange(sessionList);
+        }
+
+        OnSessionListUpdatedEvent?.Invoke(_availableSessions);
+    }
     public void OnCustomAuthenticationResponse(NetworkRunner runner, Dictionary<string, object> data) { }
     public void OnHostMigration(NetworkRunner runner, HostMigrationToken hostMigrationToken) { }
     public void OnReliableDataReceived(NetworkRunner runner, PlayerRef player, ReliableKey key, ReadOnlySpan<byte> data) { }

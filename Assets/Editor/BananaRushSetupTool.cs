@@ -65,7 +65,7 @@ public static class BananaRushSetupTool
 
             BuildPlayerPrefab(animatorController, idleSprite);
             BuildBananaPrefab("Banana", bananaSprite, 5);
-            BuildBananaPrefab("BananaExplosiva", bananaExplosivaSprite, -5);
+            BuildBananaPrefab("BananaExplosiva", bananaExplosivaSprite, -10);
             BuildGameManagerPrefab();
 
             UpdateGameScene(backgroundSprite, groundTile, dirtFillSprite);

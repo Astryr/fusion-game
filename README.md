@@ -6,35 +6,32 @@ jugadores) hecho en **Unity** con **Photon Fusion 2** como capa de
 networking: los jugadores corren de punta a punta de un mapa para atrapar
 bananas que caen desde arriba antes de que toquen el piso.
 
-> Estado actual: **jugable de punta a punta**. Conexión en red, personaje,
-> movimiento/salto, lluvia de bananas con puntaje y condición de victoria ya
-> están implementados sobre la base de Photon Fusion 2 (Shared Mode).
+> Estado actual: **prototipo de primera entrega**. Lobby con lista de salas,
+> ready check, 6 minijuegos del GDD y loop completo
+> (conexion → lobby → minijuego → resultado → volver al lobby).
 
 ## Gameplay
 
-- Cada jugador elige un **nombre** antes de conectarse (junto con el nombre
-  de sala) y controla a **Moniko**, un mono con un tinte de color distinto
-  por jugador para diferenciarse.
-- La partida **no arranca hasta que haya al menos 2 jugadores** en la sala
-  (ver `_minPlayersToStart` en `BananaGameManager`). Mientras se espera, se
-  muestra "Esperando jugadores...". Al llegar a la cantidad necesaria
-  arranca una **cuenta regresiva de 5 segundos** para que todos se
-  preparen antes de que empiecen a caer bananas.
-- Movimiento: **A/D** o flechas izquierda/derecha para caminar, **Espacio**
-  (o W / flecha arriba) para un salto. No hay colisión entre
-  jugadores (se pueden atravesar), pero sí con el piso — el mapa es
-  "cerrado" (no hay espacio a los costados para salirse de la zona
-  visible).
-- Bananas normales y explosivas caen desde arriba del mapa a velocidad
-  variable: si un jugador la toca antes de que llegue al piso suma
-  **+5 puntos** (normal) o resta **-5 puntos** (explosiva, con mínimo 0).
-  Si la banana llega al piso sin que nadie la toque, se pierde sin sumar ni
-  restar.
-- Arriba a la izquierda de la pantalla hay una tabla de puntajes en vivo,
-  ordenada de mayor a menor.
-- El primer jugador en llegar al puntaje objetivo (**100** por defecto, ver
-  `BananaGameManager` en el Inspector) gana: la pantalla se pone negra y
-  aparece su nombre en el centro, en la pantalla de **todos** los jugadores.
+- En el menu cada jugador pone su **nombre**, ve las **salas abiertas**
+  (o crea una) y elige el **minijuego**. Maximo **4** jugadores por sala.
+- Al entrar se queda en el **lobby**. El juego **no arranca solo**: hace
+  falta que haya al menos 2 jugadores y que **todos** apreten
+  **ESTOY LISTO**. Recien ahi corre la cuenta regresiva.
+- El host puede cambiar el minijuego desde el lobby (eso cancela los ready).
+- Cada mono tiene **color + nombre** arriba de la cabeza. Controles de
+  movimiento: **A/D** o flechas, **Espacio** para saltar (o para el golpeo
+  de pecho).
+- Minijuegos (GDD, con los sprites que hay):
+  - **Lluvia de bananas**: +5 / explosiva **-10**. Gana quien llega a 100.
+    A los 2:30 arranca un corte de 30s y gana el mejor puntaje.
+  - **Parkour**: carrera a la meta. Si te come la avalancha, quedas fuera.
+  - **Tronco gigante**: el tronco se achica, te pueden empujar, y caen
+    cascaras que aturden 3s.
+  - **Golpeo de pecho**: spam de Espacio con ritmo. Si el calor llega a
+    rojo, perdes.
+  - **Puzzle 4x4**: memoriza el cuadro. Una ficha mal mueve otra correcta.
+  - **Rompe el arbol**: QTE de teclas. Las rojas son trampa. Primero a 30.
+- Al terminar se ve el ganador y **Volver al lobby** para otra ronda.
 
 ## Stack técnico
 
@@ -46,34 +43,17 @@ bananas que caen desde arriba antes de que toquen el piso.
 
 ## ¿Qué esta hecho ya?
 
-- Conexión a una sala de Photon por nombre (**Shared Mode**): si la sala no
-  existe se crea, si ya existe te unís a ella. Así cualquier compañero
-  puede sumarse escribiendo el mismo nombre de sala.
-- Pantalla inicial con nombre de jugador + nombre de sala (`MainMenuController`).
-- Spawn automático del jugador al conectarse (`NetworkRunnerHandler`), con
-  el director de partida (`BananaGameManager`) spawneado por el Master
-  Client de la sala (autoridad que migra sola si ese jugador se va).
-- Personaje Moniko con animaciones de Idle/Caminar/Salto (`Assets/Animations/Player`)
-  y movimiento plataformero simple (izquierda/derecha + salto chico) en
-  `PlayerController`, con tinte de color distinto por jugador.
-- Nivel largo con piso propio (sprites en `Assets/Sprites/Environment`,
-  con colisión) y fondo, armados en `Assets/Scenes/Game.unity`.
-- Bananas normales y explosivas (`BananaController`) que caen desde arriba,
-  otorgan/restan puntos al ser atrapadas y desaparecen sin efecto si tocan
-  el piso.
-- Espera de jugadores + cuenta regresiva antes de arrancar la partida, y
-  tabla de puntajes en vivo + pantalla de victoria con el nombre del
-  ganador (`GameHUDController`), todo sincronizado vía el estado
-  `[Networked]` de `BananaGameManager`.
-- Tipografía propia (Bangers, `Assets/Resources/Fonts/BananaRushTitle.ttf`,
-  Open Font License) para el título "BANANA RUSH" del menú y el anuncio
-  del ganador (`UIFactory.CreateTitleText`).
-- Herramienta de editor (`Assets/Editor/BananaRushSetupTool.cs`, menú
-  **Tools > Banana Rush**) que importa los sprites, genera las animaciones
-  y arma los prefabs/escena — pensada para volver a correrse si se cambia
-  algún sprite de arte.
-- `.gitignore` / `.gitattributes` pensados para Unity + Git (y Git LFS listo
-  para cuando sumemos arte/audio pesado).
+- Conexion Photon Fusion 2 **Shared Mode**: crear sala, listar salas
+  abiertas, unirse, tope de 4 jugadores, estados y errores de conexion.
+- Lobby in-game con **ready check** (RPC `RPC_SetReady`). No arranca hasta
+  que todos esten listos. El host elige el minijuego.
+- 6 minijuegos del GDD, director de partida (`BananaGameManager`) con fase
+  lobby/countdown/playing/results sincronizada.
+- Input de Fusion (`NetworkInputData` + `NetworkButtons`), State/Input
+  Authority por jugador, bananas y cascaras con RPC de consume/stun.
+- Feedback: nombres sobre la cabeza, toasts, popups +5/-10, barras de calor
+  y QTE, pantalla de ganador y volver al lobby.
+- Tipografia Bangers para titulos y herramienta `Tools > Banana Rush`.
 
 ## Qué falta / posibles mejoras
 
@@ -109,18 +89,19 @@ Assets/
     Game.unity          Escena de juego (camara, fondo, piso, jugadores)
   Scripts/
     Core/
-      NetworkInputData.cs      Input que viaja por red (horizontal + salto)
-      NetworkRunnerHandler.cs  Conexion, spawn de jugadores/GameManager, input
-      BananaRushConfig.cs      Numeros del nivel compartidos por todo el juego
+      NetworkInputData.cs      Input de Fusion (eje + botones)
+      NetworkRunnerHandler.cs  Lobby de salas, conexion, spawn, input
+      BananaRushConfig.cs      Numeros del nivel
+      MiniGameId.cs            Minijuegos, fases, nombres
     Player/
-      PlayerController.cs      Movimiento plataformero, tinte, nickname, score
+      PlayerController.cs      Movimiento, ready, tinte, nickname, score
     Gameplay/
-      BananaController.cs      Caida de las bananas, puntaje, colision con jugador
-      BananaGameManager.cs     Spawner de bananas + condicion de victoria
+      BananaGameManager.cs     Director: lobby, ready, minijuego, resultado
+      *Minigame.cs             Los 6 minijuegos del GDD
+      BananaController.cs      Bananas / cascaras
     UI/
-      UIFactory.cs             Helpers para armar UI por codigo
-      MainMenuController.cs    Pantalla de conexion (nombre + sala)
-      GameHUDController.cs     HUD, tabla de puntajes y pantalla de victoria
+      MainMenuController.cs    Nombre, crear/listar/unirse, elegir minijuego
+      GameHUDController.cs     Lobby ready, HUD, toasts, ganador
   Sprites/              Arte importado (Player, Props, Environment)
   Animations/Player/     Clips + Animator Controller de Moniko
   Editor/

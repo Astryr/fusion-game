@@ -26,11 +26,20 @@ public class BananaController : NetworkBehaviour
     [SerializeField] private float _fallSpeed = 4f;
 
     [Networked] private NetworkBool Consumed { get; set; }
+    [Networked] private NetworkBool IsStunPeel { get; set; }
+    [Networked] private float StunSeconds { get; set; }
 
     /// <summary>Fija la velocidad de caida de esta instancia (llamado por BananaGameManager al spawnear).</summary>
     public void Configure(float fallSpeed)
     {
         _fallSpeed = fallSpeed;
+    }
+
+    public void BecomeStunPeel(float stunSeconds)
+    {
+        IsStunPeel = true;
+        StunSeconds = stunSeconds;
+        _pointValue = 0;
     }
 
     public override void FixedUpdateNetwork()
@@ -72,7 +81,16 @@ public class BananaController : NetworkBehaviour
         // a tocar el puntaje. Este trigger puede disparar en varios clientes
         // a la vez (cada uno simula fisica local de los proxies), por eso el
         // pedido de despawn de abajo tambien esta protegido contra duplicados.
-        player.ReceiveBananaHit(_pointValue);
+        if (IsStunPeel)
+        {
+            player.ApplyStun(StunSeconds > 0f ? StunSeconds : 3f);
+            GameFeedback.WorldPopup(player.transform.position + Vector3.up, "CASCARA", new Color(1f, 0.85f, 0.25f));
+        }
+        else
+        {
+            player.ReceiveBananaHit(_pointValue);
+        }
+
         RequestConsume();
     }
 

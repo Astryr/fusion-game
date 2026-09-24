@@ -204,5 +204,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b8fce0a52e9b2d14da4e68550f070073, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BananaController
-  _pointValue: -5
+  _pointValue: -10
   _fallSpeed: 4
