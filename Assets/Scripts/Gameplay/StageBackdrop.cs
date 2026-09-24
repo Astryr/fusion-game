@@ -1,12 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Fondo de la escena Game vs fondo que sigue a la camara.
-/// Los minijuegos estaticos (lluvia, tronco, pecho, puzzle, arbol)
-/// dejan el Background/Ground de la escena. Los que corren hacia
-/// los costados ocultan ese piso corto y arman un parallax tileado
-/// para que no se vea el color solido de la camara.
-/// </summary>
 public static class StageBackdrop
 {
     private const string SceneBackgroundName = "Background";

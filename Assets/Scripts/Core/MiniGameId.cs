@@ -1,8 +1,3 @@
-/// <summary>
-/// Minijuegos de Banana Rush (GDD). El host elige uno en el menu/lobby
-/// y queda publicado en las Session Properties para que se vea en la lista
-/// de salas.
-/// </summary>
 public enum MiniGameId
 {
     BananaRain = 0,
@@ -36,7 +31,7 @@ public static class MiniGameNames
         "Quietos en la salida. Al 0 corren. Si te caes, ves al que va primero.",
         "Quedate en el tronco. Empuja a los demas y cuidado con las cascaras.",
         "Spamea ESPACIO con ritmo. Si te pasas, el pecho se pone rojo y perdes.",
-        "Cada uno tiene su tablero. 9 pares. 10s para mirar. El primero en completar gana.",
+        "Cada uno tiene su tablero. 9 pares. 7s para mirar. El primero en completar gana.",
         "Apreta la tecla que aparece. Las rojas son trampa. Primero a 30 gana.",
     };
 

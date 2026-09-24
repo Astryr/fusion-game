@@ -1,8 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Musica de fondo: menu/lobby vs minijuegos (desde la cuenta atras).
-/// </summary>
 public class GameAudio : MonoBehaviour
 {
     public static GameAudio Instance { get; private set; }

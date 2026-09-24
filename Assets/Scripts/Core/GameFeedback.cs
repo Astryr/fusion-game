@@ -1,10 +1,6 @@
 using System;
 using UnityEngine;
 
-/// <summary>
-/// Canal local de feedback visual (toasts, popups). Lo disparan RPCs o
-/// el gameplay y lo escucha el HUD.
-/// </summary>
 public static class GameFeedback
 {
     public static event Action<string, Color> ToastRaised;

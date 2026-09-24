@@ -1,10 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// Memotest local 6x3 (9 pares). Cada jugador ve su propio tablero
-/// mezclado. El primero que complete las 9 parejas gana.
-/// </summary>
 public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
 {
     public MiniGameId Id => MiniGameId.MemoryPuzzle;
@@ -13,7 +9,7 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
     public const int Rows = 3;
     public const int CellCount = Columns * Rows;
     public const int PairCount = CellCount / 2;
-    public const float PeekSeconds = 10f;
+    public const float PeekSeconds = 7f;
     public const float MismatchSeconds = 0.85f;
 
     private BananaGameManager _director;

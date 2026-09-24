@@ -2,12 +2,6 @@ using System.Collections.Generic;
 using Fusion;
 using UnityEngine;
 
-/// <summary>
-/// Director de la sala en Shared Mode: lobby + ready check + minijuego
-/// elegido + resultados. Lo spawnea el Master Client. El estado de fase,
-/// minijuego y temporizadores es [Networked]; el ready de cada mono vive
-/// en <see cref="PlayerController.IsReady"/>.
-/// </summary>
 public class BananaGameManager : NetworkBehaviour
 {
     public static BananaGameManager Instance { get; private set; }
@@ -29,6 +23,7 @@ public class BananaGameManager : NetworkBehaviour
     [Networked] public int WinnerScore { get; set; }
     [Networked] public NetworkString<_32> WinnerName { get; set; }
     [Networked] public NetworkString<_16> WinnerDetail { get; set; }
+    [Networked] public NetworkString<_256> ResultsBoard { get; set; }
 
     public bool MatchStarted => Phase == MatchPhase.Playing;
     public bool IsGameOver => Phase == MatchPhase.Results;
@@ -322,6 +317,7 @@ public class BananaGameManager : NetworkBehaviour
         WinnerName = default;
         WinnerDetail = default;
         WinnerScore = 0;
+        ResultsBoard = default;
         ResetPlayersForLobby();
     }
 
@@ -388,6 +384,7 @@ public class BananaGameManager : NetworkBehaviour
         WinnerName = default;
         WinnerDetail = default;
         WinnerScore = 0;
+        ResultsBoard = default;
 
         foreach (var player in GetPlayers())
         {
@@ -402,6 +399,7 @@ public class BananaGameManager : NetworkBehaviour
         string name = winner != null ? winner.DisplayName : "Nadie";
         WinnerName = name;
         WinnerDetail = string.IsNullOrEmpty(detail) ? "Ganador" : detail;
+        ResultsBoard = SelectedGame == MiniGameId.Parkour ? BuildParkourBoard(winner) : default;
         int score = winner != null ? winner.Score : 0;
         if (SelectedGame == MiniGameId.MemoryPuzzle)
         {
@@ -412,6 +410,61 @@ public class BananaGameManager : NetworkBehaviour
         AwardCupPoints();
         Phase = MatchPhase.Results;
         RPC_ShowFeedback($"{name} gana", 0);
+    }
+
+    private string BuildParkourBoard(PlayerController winner)
+    {
+        string[] places = { "1er Lugar", "2do lugar", "3er lugar", "4to lugar" };
+        var placed = new List<PlayerController>();
+        var fallen = new List<string>();
+
+        if (winner != null && winner.IsSpawned)
+        {
+            placed.Add(winner);
+        }
+
+        var others = new List<PlayerController>(GetPlayers());
+        others.Sort((a, b) =>
+        {
+            int byScore = b.Score.CompareTo(a.Score);
+            if (byScore != 0)
+            {
+                return byScore;
+            }
+
+            return b.transform.position.x.CompareTo(a.transform.position.x);
+        });
+
+        foreach (var player in others)
+        {
+            if (player == null || !player.IsSpawned || player == winner)
+            {
+                continue;
+            }
+
+            if (player.IsEliminated)
+            {
+                fallen.Add(player.DisplayName);
+            }
+            else
+            {
+                placed.Add(player);
+            }
+        }
+
+        var lines = new List<string>();
+        for (int i = 0; i < placed.Count && i < places.Length; i++)
+        {
+            lines.Add($"{places[i]}: {placed[i].DisplayName}.");
+        }
+
+        if (fallen.Count > 0)
+        {
+            lines.Add(string.Empty);
+            lines.Add($"Caidos: {string.Join(", ", fallen)}.");
+        }
+
+        return lines.Count > 0 ? string.Join("\n", lines) : "Nadie termino.";
     }
 
     private void AwardCupPoints()
@@ -474,11 +527,18 @@ public class BananaGameManager : NetworkBehaviour
 
     private void HandlePhaseVisuals(MatchPhase previous, MatchPhase next)
     {
-        bool leavingPlayArea = previous == MatchPhase.Playing ||
-                               (previous == MatchPhase.Countdown && next != MatchPhase.Playing);
-        if (leavingPlayArea)
+        if (previous == MatchPhase.Playing && next == MatchPhase.Results)
         {
             _active?.OnMatchEnded();
+        }
+        else if (previous == MatchPhase.Playing || (previous == MatchPhase.Countdown && next != MatchPhase.Playing))
+        {
+            _active?.OnMatchEnded();
+            _active?.Cleanup();
+        }
+
+        if (previous == MatchPhase.Results && next == MatchPhase.Lobby)
+        {
             _active?.Cleanup();
         }
 

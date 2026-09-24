@@ -3,14 +3,6 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-/// <summary>
-/// Utilidades para armar una UI basica (Canvas, botones, inputs, texto)
-/// enteramente por codigo. Se eligio este enfoque para que el proyecto
-/// tenga un menu y un HUD funcionales desde el primer commit sin depender
-/// de escenas .unity con jerarquias de UI armadas a mano en el editor.
-/// Cuando el equipo tenga el diseño final de UI (segun el GDD), esta UI
-/// placeholder se puede reemplazar sin tocar la logica de red.
-/// </summary>
 public static class UIFactory
 {
     private static Font _titleFont;
@@ -88,12 +80,6 @@ public static class UIFactory
         return text;
     }
 
-    /// <summary>
-    /// Texto grande para titulos/banners (ej. "BANANA RUSH" en el menu o el
-    /// anuncio del ganador), con la tipografia divertida de
-    /// <c>Assets/Resources/Fonts/BananaRushTitle.ttf</c> y un borde (Outline)
-    /// para que se lea bien sobre cualquier fondo.
-    /// </summary>
     public static Text CreateTitleText(Transform parent, string content, int fontSize, Color color, Color outlineColor)
     {
         var go = new GameObject("Title", typeof(Text), typeof(Outline));

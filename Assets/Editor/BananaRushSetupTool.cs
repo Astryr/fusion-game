@@ -9,18 +9,6 @@ using UnityEditor.SceneManagement;
 using UnityEditor.U2D.Sprites;
 using UnityEngine;
 
-/// <summary>
-/// Herramienta de editor "de una sola corrida" que termina de armar Banana
-/// Rush a partir de los sprites en Assets/Sprites: configura el importer de
-/// cada textura, slicea las hojas de animacion y el tileset del piso, genera
-/// las animaciones/Animator de Moniko, arma los prefabs de red (Player,
-/// Banana, BananaExplosiva, BananaGameManager) y deja lista la escena Game
-/// (camara, fondo, piso). Se puede volver a correr sin problema: cada paso
-/// sobreescribe lo anterior en vez de duplicar.
-///
-/// Se puede ejecutar desde el menu Tools/Banana Rush/Run Full Setup, o desde
-/// linea de comandos en batchmode con -executeMethod BananaRushSetupTool.RunAll.
-/// </summary>
 public static class BananaRushSetupTool
 {
     private const float PixelsPerUnit = 64f;
@@ -82,10 +70,6 @@ public static class BananaRushSetupTool
         }
     }
 
-    // -----------------------------------------------------------------
-    // Import de sprites
-    // -----------------------------------------------------------------
-
     private static void ConfigureSingleSprite(string path, Vector2 pivot, FilterMode filterMode)
     {
         var importer = (TextureImporter)AssetImporter.GetAtPath(path);
@@ -97,9 +81,7 @@ public static class BananaRushSetupTool
         importer.mipmapEnabled = false;
         importer.alphaIsTransparency = true;
 
-        // TextureImporter ya no expone "spriteAlignment" directo en Unity 6:
-        // hay que pasar por TextureImporterSettings para poder fijar un pivot
-        // custom en modo Single.
+        // Unity 6: pivot custom solo via TextureImporterSettings.
         var settings = new TextureImporterSettings();
         importer.ReadTextureSettings(settings);
         settings.spriteAlignment = (int)SpriteAlignment.Custom;
@@ -186,12 +168,7 @@ public static class BananaRushSetupTool
 
         ApplySpriteRects(importer, path, rects, new Vector2(0.5f, 0.5f));
 
-        // Cada pieza es un bloque de piso completo (pasto arriba + tierra con
-        // piedritas abajo, ver zoom durante el desarrollo), pensado para
-        // repetirse solo HORIZONTALMENTE. El tileset trae 3 variantes iguales
-        // arriba (bordes + una del medio) y otras 3 abajo con menos pasto; nos
-        // quedamos con la fila de arriba (mas pasto visible) y, dentro de esa
-        // fila, la pieza mas centrada (las de los costados son remates).
+        // Fila de arriba (mas pasto) y la pieza mas centrada de esa fila.
         int topY = islands.Max(i => i.y);
         float centerX = texture.width / 2f;
         int grassIndex = MostCenteredInRow(islands, topY, centerX);
@@ -202,11 +179,6 @@ public static class BananaRushSetupTool
         return grass;
     }
 
-    /// <summary>
-    /// Genera (si no existe) un sprite chico de color solido, para usar como
-    /// relleno debajo de la franja de pasto/tierra del piso sin depender de
-    /// otro tile del tileset.
-    /// </summary>
     private static Sprite EnsureSolidColorSprite(string path, Color32 color)
     {
         if (!File.Exists(path))
@@ -260,9 +232,7 @@ public static class BananaRushSetupTool
         ISpriteEditorDataProvider dataProvider = factory.GetSpriteEditorDataProviderFromObject(importer);
         dataProvider.InitSpriteEditorDataProvider();
 
-        // Reusar los spriteID existentes por nombre: si se regeneran, los
-        // clips de animacion quedan apuntando a IDs viejos y ese frame se
-        // ve vacio (el personaje "desaparece" un instante).
+        // Reusar spriteID por nombre: si se regeneran, los clips pierden frames.
         SpriteRect[] existing = dataProvider.GetSpriteRects() ?? Array.Empty<SpriteRect>();
         var existingByName = existing.ToDictionary(r => r.name, r => r);
 
@@ -360,10 +330,6 @@ public static class BananaRushSetupTool
         return islands;
     }
 
-    // -----------------------------------------------------------------
-    // Animaciones + Animator de Moniko
-    // -----------------------------------------------------------------
-
     private static RuntimeAnimatorController BuildPlayerAnimator(Sprite idleSprite, Sprite[] walkFrames, Sprite[] jumpFrames)
     {
         EnsureFolder(AnimationsDir);
@@ -371,9 +337,7 @@ public static class BananaRushSetupTool
         AnimationClip idleClip = CreateSpriteClip($"{AnimationsDir}/Moniko_Idle.anim", new[] { idleSprite }, 4f, true);
         AnimationClip walkClip = CreateSpriteClip($"{AnimationsDir}/Moniko_Walk.anim", walkFrames, 10f, true);
 
-        // El spritesheet de salto arranca en pose de piso y termina aterrizando.
-        // En el aire solo queremos las poses de vuelo, y sin loop: si loopea
-        // se ve el agachado otra vez a mitad de salto.
+        // Salto: solo poses de vuelo y sin loop (el sheet incluye piso/aterrizaje).
         Sprite[] airborneJump = PickAirborneJumpFrames(jumpFrames);
         AnimationClip jumpClip = CreateSpriteClip($"{AnimationsDir}/Moniko_Jump.anim", airborneJump, 12f, false);
 
@@ -389,12 +353,7 @@ public static class BananaRushSetupTool
         controller.layers = layers;
         controller.AddParameter("Speed", AnimatorControllerParameterType.Float);
 
-        // Ojo: el default tiene que ser "true". Los personajes arrancan
-        // parados en el piso, y con default "false" el Animator entra al
-        // estado Idle pero ENSEGUIDA evalua la transicion "Idle -> Jump
-        // cuando Grounded=false" (que ya se cumple con el default, antes de
-        // que el primer FixedUpdateNetwork llegue a corregirlo) y se queda
-        // trabado mostrando la pose de salto para siempre.
+        // Grounded default true: si arranca false, Idle salta a Jump antes del primer tick.
         controller.AddParameter(new AnimatorControllerParameter
         {
             name = "Grounded",
@@ -505,9 +464,7 @@ public static class BananaRushSetupTool
             propertyName = "m_Sprite",
         };
 
-        // Si el ultimo keyframe queda justo en el ultimo frame, ese frame se
-        // ve un instante. Se agrega un key extra al final: en loop repite el
-        // primero (ciclo parejo); si no loopea, sostiene el ultimo sprite.
+        // Key extra al final: en loop cicla al primero; si no, sostiene el ultimo.
         var keyframes = new ObjectReferenceKeyframe[frames.Length + 1];
         for (int i = 0; i < frames.Length; i++)
         {
@@ -522,10 +479,6 @@ public static class BananaRushSetupTool
         return clip;
     }
 
-    // -----------------------------------------------------------------
-    // Physics2D
-    // -----------------------------------------------------------------
-
     private static void ConfigurePhysics2D()
     {
         int playerLayer = LayerMask.NameToLayer("Player");
@@ -537,7 +490,6 @@ public static class BananaRushSetupTool
             throw new InvalidOperationException("Faltan los layers Player/Ground/Banana en TagManager.asset.");
         }
 
-        // Los jugadores no chocan entre si, pero si con el piso y las bananas.
         Physics2D.IgnoreLayerCollision(playerLayer, playerLayer, true);
         Physics2D.IgnoreLayerCollision(playerLayer, groundLayer, false);
         Physics2D.IgnoreLayerCollision(playerLayer, bananaLayer, false);
@@ -546,10 +498,6 @@ public static class BananaRushSetupTool
 
         Debug.Log("[BananaRush] Physics2D layer collision matrix configurada.");
     }
-
-    // -----------------------------------------------------------------
-    // Prefabs
-    // -----------------------------------------------------------------
 
     private static void BuildPlayerPrefab(RuntimeAnimatorController controller, Sprite idleSprite)
     {
@@ -667,10 +615,6 @@ public static class BananaRushSetupTool
         }
     }
 
-    // -----------------------------------------------------------------
-    // Escena Game: camara, fondo y piso
-    // -----------------------------------------------------------------
-
     private static void UpdateGameScene(Sprite backgroundSprite, Sprite groundTile, Sprite dirtFillSprite)
     {
         const string scenePath = "Assets/Scenes/Game.unity";
@@ -717,12 +661,7 @@ public static class BananaRushSetupTool
         backgroundGO.transform.position = new Vector3(0f, BananaRushConfig.CameraCenterY, 0f);
         backgroundGO.transform.localScale = new Vector3(desiredWidth / spriteWidthUnits, desiredHeight / spriteHeightUnits, 1f);
 
-        // El piso se arma con dos capas: la pieza del tileset (que ya trae
-        // pasto arriba + tierra abajo dibujados) tileada SOLO a lo ancho y
-        // usada una unica vez de alto (repetirla en vertical duplicaba el
-        // pasto y quedaba a rayas), mas un relleno de color solido por debajo
-        // que ocupa el resto del grosor del collider para que no se vea
-        // "flotando".
+        // Pasto tileado solo en X; no repetir en vertical (raya el pasto).
         float groundWidth = BananaRushConfig.GroundHalfWidth * 2f;
         float grassHeight = groundTile.rect.height / groundTile.pixelsPerUnit;
         float dirtHeight = Mathf.Max(0.1f, BananaRushConfig.GroundThickness - grassHeight);
@@ -736,9 +675,7 @@ public static class BananaRushSetupTool
         groundGO.layer = LayerMask.NameToLayer("Ground");
         groundGO.transform.position = Vector3.zero;
 
-        // Corridas viejas de esta herramienta dejaban el SpriteRenderer
-        // directo en "Ground"; ahora el dibujado vive en los hijos
-        // GrassTop/DirtFill, asi que si quedo ese componente hay que sacarlo.
+        // Setup viejo: SpriteRenderer en Ground; ahora dibujan los hijos.
         var obsoleteRenderer = groundGO.GetComponent<SpriteRenderer>();
         if (obsoleteRenderer != null)
         {
@@ -780,11 +717,6 @@ public static class BananaRushSetupTool
 
         Debug.Log("[BananaRush] Escena Game actualizada (camara, fondo, piso).");
     }
-
-    // -----------------------------------------------------------------
-    // Verificacion visual (no se guarda nada, solo genera un PNG para
-    // inspeccionar a ojo que el nivel/personajes/props se vean bien)
-    // -----------------------------------------------------------------
 
     [MenuItem("Tools/Banana Rush/Capture Visual Test")]
     public static void CaptureVisualTest()
@@ -828,14 +760,6 @@ public static class BananaRushSetupTool
         EditorApplication.Exit(0);
     }
 
-    /// <summary>
-    /// Prueba puntual para el bug de "el mono arranca trabado en la pose de
-    /// salto": crea un Animator con el controller de Moniko, lo hace avanzar
-    /// varios frames SIN llamar SetBool (el peor caso, para que dependa
-    /// pura y exclusivamente del default del parametro "Grounded") y loguea
-    /// en que estado termina. Si el default esta bien (true), tiene que
-    /// quedarse en Idle.
-    /// </summary>
     [MenuItem("Tools/Banana Rush/Test Animator Grounded Default")]
     public static void TestAnimatorGroundedDefault()
     {
@@ -861,10 +785,6 @@ public static class BananaRushSetupTool
 
             LogAnimatorState(animator, "despues de 20 frames sin llamar SetBool");
 
-            // Ahora el ciclo real: saltar (Grounded=false) y aterrizar
-            // (Grounded=true) de nuevo, para confirmar que las transiciones
-            // van y vuelven bien (no que quedo pegado en Idle porque las
-            // transiciones estan rotas).
             animator.SetBool("Grounded", false);
             for (int i = 0; i < 5; i++)
             {
@@ -901,10 +821,6 @@ public static class BananaRushSetupTool
         sr.color = tint;
         sr.flipX = flip;
     }
-
-    // -----------------------------------------------------------------
-    // Utils
-    // -----------------------------------------------------------------
 
     private static Transform EnsureChild(Transform parent, string name)
     {

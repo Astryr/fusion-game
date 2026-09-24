@@ -8,18 +8,6 @@ using UnityEngine.SceneManagement;
 
 #pragma warning disable CS0618
 
-/// <summary>
-/// Punto central de conexion a Photon Fusion 2.
-///
-/// Vive en la escena <c>MainMenu</c> y sobrevive al cambio de escena
-/// (DontDestroyOnLoad) para seguir recibiendo callbacks de red mientras
-/// se juega en <c>Game</c>. Usa <see cref="GameMode.Shared"/> porque es el
-/// modo mas simple para arrancar (sin necesidad de manejar host dedicado ni
-/// reconciliacion). Ademas de conectar y spawnear jugadores, el cliente que
-/// resulta ser el Master Client de la sala (Shared Mode) es quien spawnea el
-/// <see cref="BananaGameManager"/> (autoridad sobre la lluvia de bananas y la
-/// condicion de victoria).
-/// </summary>
 public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
 {
     public static NetworkRunnerHandler Instance { get; private set; }
@@ -46,7 +34,6 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
     public MiniGameId PendingMiniGame { get; private set; } = MiniGameId.BananaRain;
     public IReadOnlyList<SessionInfo> AvailableSessions => _availableSessions;
 
-    /// <summary>Nombre elegido en el menu antes de conectarse. Lo lee <see cref="PlayerController.Spawned"/>.</summary>
     public string LocalNickname { get; private set; }
 
     public event Action OnConnectingEvent;
@@ -65,8 +52,7 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
     private bool _browsing;
     private bool _browseStopping;
 
-    // Fusion no llama OnInput en el mismo ritmo que Update: si leemos
-    // GetKeyDown ahi, el toque de ESPACIO se puede perder entre ticks.
+    // GetKeyDown dura un frame; OnInput de Fusion puede perderlo.
     private bool _jumpQueued;
     private bool _actionQueued;
 
@@ -147,7 +133,7 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         }
         catch (Exception)
         {
-            // Fusion tira ApplicationQuit si el lobby todavia se estaba conectando.
+            // Shutdown en quit tira ObjectDisposedException.
         }
 
         _browseStopping = false;
@@ -173,9 +159,6 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         return ConnectInternalAsync(sessionName, nickname, createIfMissing: false, MiniGameId.BananaRain);
     }
 
-    /// <summary>
-    /// Crea (si no existe) o une a la sesion Shared con el nombre indicado.
-    /// </summary>
     public Task<bool> ConnectAsync(string sessionName, string nickname)
     {
         return CreateSessionAsync(sessionName, nickname, PendingMiniGame);
@@ -283,20 +266,13 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         };
     }
 
-    /// <summary>Corta la conexion actual (boton "Salir" del HUD).</summary>
     public void Disconnect()
     {
         Runner?.Shutdown();
     }
 
-    /// <summary>
-    /// Reparte a los jugadores en fila sobre el piso (el mapa de Banana Rush
-    /// es horizontal: se camina de punta a punta, no hay filas/columnas).
-    /// </summary>
     private static Vector3 GetSpawnPosition(int playerIndex)
     {
-        // 4 posiciones (el rango tipico pedido es 2-4 jugadores); si hay mas
-        // se reparten en las mismas 4 columnas.
         const int slots = 4;
         float spread = BananaRushConfig.PlayerClampX * 0.85f;
 
@@ -307,11 +283,6 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         return new Vector3(x, BananaRushConfig.GroundTopY, 0f);
     }
 
-    /// <summary>
-    /// Solo el Master Client de la sala (Shared Mode) spawnea el director de
-    /// partida. Se marca con <see cref="NetworkSpawnFlags.SharedModeStateAuthMasterClient"/>
-    /// para que, si el Master Client se va, la autoridad migre sola al nuevo.
-    /// </summary>
     private void TrySpawnGameManager(NetworkRunner runner)
     {
         if (_gameManagerSpawnRequested || _gameManagerPrefab == null)
@@ -329,10 +300,6 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
             onBeforeSpawned: null, flags: NetworkSpawnFlags.SharedModeStateAuthMasterClient);
     }
 
-    // ---------------------------------------------------------------
-    // INetworkRunnerCallbacks
-    // ---------------------------------------------------------------
-
     public void OnPlayerJoined(NetworkRunner runner, PlayerRef player)
     {
         if (!IsGameRunner(runner))
@@ -340,9 +307,7 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
             return;
         }
 
-        // En Shared Mode cada cliente hace spawn de SU PROPIO personaje
-        // (tiene la autoridad de estado sobre lo que crea), por eso se
-        // compara contra runner.LocalPlayer.
+        // Shared Mode: cada cliente spawnea su propio Player.
         if (player == runner.LocalPlayer && !_spawnedPlayers.ContainsKey(player))
         {
             if (_playerPrefab != null)
@@ -391,8 +356,7 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) horizontal -= 1f;
         if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) horizontal += 1f;
 
-        // Salto: solo ESPACIO (nada de W ni flecha arriba). El buffer se
-        // consume aca para no perder el toque si Fusion poll-ea en otro frame.
+        // Solo Space; el buffer se consume aca.
         var buttons = default(NetworkButtons);
         buttons.Set(InputButton.Jump, _jumpQueued);
         buttons.Set(InputButton.Action, _actionQueued);

@@ -1,152 +1,92 @@
 # Banana Rush (Unity + Photon Fusion 2)
 
-Proyecto para la materia **Juegos en Red** de la Licenciatura en Desarrollo
-de Videojuegos. **Banana Rush** es un minijuego 2D multijugador (2-4
-jugadores) hecho en **Unity** con **Photon Fusion 2** como capa de
-networking: los jugadores corren de punta a punta de un mapa para atrapar
-bananas que caen desde arriba antes de que toquen el piso.
+Proyecto para **Juegos en Red**. Banana Rush es un party game 2D de 2 a 4
+jugadores hecho en Unity 6 con Photon Fusion 2 (Shared Mode).
 
-> Estado actual: **prototipo de primera entrega**. Lobby con lista de salas,
-> ready check, 6 minijuegos del GDD y loop completo
-> (conexion → lobby → minijuego → resultado → volver al lobby).
+Loop: menu → crear o unirse a una sala → lobby con ready → un minijuego →
+pantalla de victoria → volver al lobby.
 
 ## Gameplay
 
-- En el menu cada jugador pone su **nombre**, ve las **salas abiertas**
-  (o crea una) y elige el **minijuego**. Maximo **4** jugadores por sala.
-- Al entrar se queda en el **lobby**. El juego **no arranca solo**: hace
-  falta que haya al menos 2 jugadores y que **todos** apreten
-  **ESTOY LISTO**. Recien ahi corre la cuenta regresiva.
-- Si estas testeando **sin compañeros**, el host tiene **PROBAR SOLO**:
-  con eso alcanza 1 jugador listo para arrancar el minijuego.
-- En el lobby se puede cambiar el minijuego con el dropdown o las flechas
-  (eso cancela los ready).
-- Cada mono tiene **color + nombre** arriba de la cabeza. Controles de
-  movimiento: **A/D** o flechas, **Espacio** para saltar (o para el golpeo
-  de pecho).
-- Minijuegos (GDD, con los sprites que hay):
-  - **Lluvia de bananas**: +5 / explosiva **-10** / verde rara **+20**.
-    Caen mas y mas rapido con el tiempo. Gana quien llega a 100.
-    A los 2:30 arranca un corte de 30s y gana el mejor puntaje.
-  - **Parkour**: carrera larga. Arrancan quietos en la plataforma, la
-    cuenta atras los suelta. Si te caes, tu camara sigue al que va primero.
-  - **Tronco gigante**: el tronco se achica, te pueden empujar, y caen
+- En el menu cada jugador pone su **nombre**, crea una sala o se une a una
+  de la lista, y elige el **minijuego**. Maximo 4 por sala.
+- En el lobby el juego no arranca solo: hacen falta al menos 2 jugadores y
+  que todos apreten **ESTOY LISTO**. Ahi corre una cuenta atras de 5s.
+- El host puede usar **PROBAR SOLO** para testear sin un segundo jugador.
+- En el lobby se puede cambiar el minijuego (eso cancela los ready).
+- Controles: **A/D** o flechas para moverse, **Espacio** para saltar
+  (o para el golpeo de pecho).
+- Minijuegos:
+  - **Lluvia de bananas**: +5 / explosiva -10 / verde rara +20. Gana quien
+    llega a 100. A los 2:30 hay un corte de 30s.
+  - **Parkour**: carrera. Arrancan quietos, la cuenta atras los suelta.
+    Si te caes, la camara sigue al que va primero.
+  - **Tronco gigante**: el tronco se achica, se pueden empujar, caen
     cascaras que aturden 3s.
   - **Golpeo de pecho**: spam de Espacio con ritmo. Si el calor llega a
     rojo, perdes.
-  - **Memotest 6x3**: cada jugador tiene su propio tablero (9 pares:
-    banana, banana bomba, MonikoBoca, Cazador, Cazador azul, banana espada
-    y bananas verde/roja/azul). 10s para mirar. El primero en completar gana.
+  - **Memotest**: cada jugador tiene su tablero 6x3 (9 pares). 7s para
+    mirar. El primero en completar gana.
   - **Rompe el arbol**: QTE de teclas. Las rojas son trampa. Primero a 30.
-- Al terminar se ve el ganador y **Volver al lobby** para otra ronda.
+- Al terminar se ven puestos y puntos de Copa (4-3-2-1). Desde ahi se
+  vuelve al lobby para otra ronda.
 
-## Stack técnico
+## Stack
 
-- **Unity 6000.3.23f1** (Unity 6 LTS) — 2D, Built-in Render Pipeline.
-- **Photon Fusion 2** (SDK 2.1.x) en **Shared Mode**.
-- C# puro, sin Input System nuevo (se usa el Input Manager clásico) y sin
-  TextMeshPro (UI armada con `UnityEngine.UI` + fuente por defecto) para
-  minimizar pasos de configuración adicionales.
+- Unity **6000.3.23f1** (2D, Built-in Render Pipeline).
+- Photon Fusion 2 en **Shared Mode**.
+- Region fija **`sa`** (Sao Paulo) en `PhotonAppSettings`. Todas las PCs
+  tienen que usar la misma region o no se ven las salas. Si `sa` no
+  responde, cambiar `FixedRegion` a `us` en todas las maquinas.
+- Input Manager clasico y UI de `UnityEngine.UI`.
 
-## ¿Qué esta hecho ya?
+## Que esta hecho
 
-- Conexion Photon Fusion 2 **Shared Mode**: crear sala, listar salas
-  abiertas, unirse, tope de 4 jugadores, estados y errores de conexion.
-- Lobby in-game con **ready check** (RPC `RPC_SetReady`). No arranca hasta
-  que todos esten listos. El host elige el minijuego.
-- 6 minijuegos del GDD, director de partida (`BananaGameManager`) con fase
-  lobby/countdown/playing/results sincronizada.
-- Input de Fusion (`NetworkInputData` + `NetworkButtons`), State/Input
-  Authority por jugador, bananas y cascaras con RPC de consume/stun.
-- Feedback: nombres sobre la cabeza, toasts, popups +5/-10, barras de calor
-  y QTE, pantalla de ganador y volver al lobby.
-- Tipografia Bangers para titulos y herramienta `Tools > Banana Rush`.
-
-## Qué falta / posibles mejoras
-
-- Ajustar numeros de diseño a gusto (velocidad de caida de bananas,
-  puntaje objetivo, fuerza de salto) — son todos campos expuestos en el
-  Inspector de `BananaGameManager` / `PlayerController`.
-- Sesiones/lobby más avanzado (lista de salas, matchmaking, salas privadas) —
-  buen candidato para cuando se vea JR7 (Sesiones y gestión de partidas).
-- Sonido/música (no incluido en los assets de arte provistos hasta ahora).
+- Crear sala, listar salas abiertas y unirse. Tope de 4. Property de
+  sesion con el minijuego.
+- Ready check por RPC. No arranca hasta que todos estan listos.
+- 6 minijuegos. Director de partida con fases lobby / countdown /
+  playing / results.
+- Input de Fusion, State/Input Authority por jugador, bananas y cascaras
+  en red.
+- Nombres sobre la cabeza, toasts, popups, pantalla de victoria.
+- Musica de menu/lobby y de minijuegos.
+- Desconexion a mitad de partida: si queda un jugador, gana.
 
 ## Primeros pasos
 
-1. Leé [`SETUP.md`](./SETUP.md) — tiene la guía paso a paso para dejar el
-   proyecto andando en tu máquina (instalar Unity, importar Fusion, crear
-   el prefab del jugador, probar con más de una persona).
-2. Si sos la primera persona en configurar el proyecto (la que tiene el
-   AppID de Photon), seguí la sección **"Primera configuración"**.
-3. Si un compañero ya hizo el paso anterior y lo subió al repo, con seguir
-   la sección **"Para el resto del equipo"** alcanza.
-4. Si vas a usar **Cursor** (IDE con IA) en tu máquina para laburar directo
-   sobre `main` sin Pull Requests, ver `SETUP.md` → sección **"E. Trabajar
-   con Cursor en modo local"**. Las convenciones del equipo (estructura de
-   carpetas, estilo de commits, etc.) ya están en
-   [`.cursor/rules/working-style.mdc`](./.cursor/rules/working-style.mdc),
-   así que Cursor las lee solo al abrir el proyecto.
+1. Segui [`SETUP.md`](./SETUP.md).
+2. Quien tenga el AppID de Photon hace la primera configuracion una vez
+   y la sube. El resto solo clona y abre el proyecto.
+3. Las convenciones del equipo estan en
+   [`.cursor/rules/working-style.mdc`](./.cursor/rules/working-style.mdc).
 
-## Estructura del proyecto
+## Estructura
 
 ```
 Assets/
   Scenes/
-    MainMenu.unity     Pantalla inicial: nombre + crear/unirse a una sala
-    Game.unity          Escena de juego (camara, fondo, piso, jugadores)
+    MainMenu.unity
+    Game.unity
   Scripts/
-    Core/
-      NetworkInputData.cs      Input de Fusion (eje + botones)
-      NetworkRunnerHandler.cs  Lobby de salas, conexion, spawn, input
-      BananaRushConfig.cs      Numeros del nivel
-      MiniGameId.cs            Minijuegos, fases, nombres
-    Player/
-      PlayerController.cs      Movimiento, ready, tinte, nickname, score
-    Gameplay/
-      BananaGameManager.cs     Director: lobby, ready, minijuego, resultado
-      *Minigame.cs             Los 6 minijuegos del GDD
-      BananaController.cs      Bananas / cascaras
-    UI/
-      MainMenuController.cs    Nombre, crear/listar/unirse, elegir minijuego
-      GameHUDController.cs     Lobby ready, HUD, toasts, ganador
-  Sprites/              Arte importado (Player, Props, Environment)
-  Animations/Player/     Clips + Animator Controller de Moniko
-  Editor/
-    BananaRushSetupTool.cs   Herramienta "Tools > Banana Rush" (setup de arte/prefabs)
-  Resources/
-    Player.prefab, Banana.prefab, BananaExplosiva.prefab,
-    BananaGameManager.prefab   Prefabs de red (spawneados por Resources.Load)
-  Photon/               SDK de Photon Fusion 2 (importado, ver SETUP.md)
-Packages/
-  manifest.json      Dependencias del proyecto (paquetes 2D/UI de Unity)
-ProjectSettings/     Configuracion del proyecto (Force Text para poder versionar en git)
+    Core/         Conexion, input, config, audio
+    Player/       Movimiento, ready, nickname, puntaje
+    Gameplay/     Director + 6 minijuegos
+    UI/           Menu, HUD, factory
+  Sprites/
+  Animations/Player/
+  Resources/      Prefabs de red + audio + cartas del memotest
+  Editor/         Tools > Banana Rush
+  Photon/         SDK Fusion 2
 ```
 
-> Nota: las carpetas van directo bajo `Assets/` (sin carpeta envoltorio tipo
-> `_Project`), organizadas por dominio (`Scripts/Player`, `Scripts/UI`, etc.),
-> siguiendo el mismo orden que usamos en otros proyectos del equipo.
+## Repositorio
 
-## Sobre el repositorio
+https://github.com/Astryr/fusion-game (privado). Invitar al equipo desde
+Settings → Collaborators. Como clonarlo esta en `SETUP.md`.
 
-El código vive en GitHub: **<https://github.com/Astryr/fusion-game>**
-(repositorio privado). Para invitar compañeros de equipo, sumalos como
-colaboradores desde **Settings → Collaborators** en esa página.
+## Git
 
-Para clonarlo, la forma más simple es con
-[GitHub Desktop](https://desktop.github.com/) (sin usar la terminal) — ver
-el detalle en [`SETUP.md`](./SETUP.md) → sección "Clonar el repositorio".
-
-## Control de versiones
-
-- Se versiona **todo** el proyecto Unity (Assets, Packages, ProjectSettings),
-  incluyendo — una vez importado — la carpeta `Assets/Photon` con el SDK y
-  la configuración del AppID, para que ningún compañero tenga que repetir
-  la importación manual.
-- `Library/`, `Temp/`, `Obj/`, `Build/` y `UserSettings/` están ignorados:
-  Unity los regenera solo al abrir el proyecto.
-- Este proyecto usa **Git LFS** para binarios pesados (imágenes, audio,
-  modelos). Antes de sumar assets de ese tipo, corré una vez por máquina:
-
-  ```bash
-  git lfs install
-  ```
+Se versiona Assets, Packages y ProjectSettings (incluye Photon y el
+AppID). `Library/`, `Temp/`, `Obj/`, `Build/` y `UserSettings/` estan
+ignorados. Para binarios pesados: `git lfs install`.

@@ -1,9 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Contenedor local de props de un minijuego (plataformas, avalancha, etc.).
-/// Se destruye entero al limpiar.
-/// </summary>
 public static class MiniGameWorld
 {
     public const string RootName = "MiniGameWorld";

@@ -3,9 +3,6 @@ using Fusion;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// Menu: nickname, crear sala + minijuego, y lista de salas disponibles.
-/// </summary>
 public class MainMenuController : MonoBehaviour
 {
     private InputField _nicknameInput;

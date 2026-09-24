@@ -1,20 +1,6 @@
 using Fusion;
 using UnityEngine;
 
-/// <summary>
-/// Banana que cae desde arriba del mapa. El puntaje que otorga (positivo
-/// para la banana normal, negativo para la explosiva, ver
-/// <see cref="_pointValue"/>) queda fijado en el prefab: Banana.prefab y
-/// BananaExplosiva.prefab son dos prefabs distintos con ese valor distinto,
-/// asi que la autoridad y las copias (proxies) en todos los clientes
-/// arrancan siempre con el valor correcto sin necesitar sincronizarlo por
-/// red.
-///
-/// El movimiento de caida solo lo calcula quien tiene StateAuthority (quien
-/// la spawneo, ver <see cref="BananaGameManager"/>); el resto de los
-/// clientes solo ven la posicion ya replicada por el NetworkTransform del
-/// prefab.
-/// </summary>
 [RequireComponent(typeof(SpriteRenderer))]
 [RequireComponent(typeof(CircleCollider2D))]
 public class BananaController : NetworkBehaviour
@@ -50,7 +36,6 @@ public class BananaController : NetworkBehaviour
         }
     }
 
-    /// <summary>Fija la velocidad de caida de esta instancia (llamado por BananaGameManager al spawnear).</summary>
     public void Configure(float fallSpeed)
     {
         Configure(fallSpeed, _pointValue);
@@ -75,9 +60,6 @@ public class BananaController : NetworkBehaviour
 
     public override void FixedUpdateNetwork()
     {
-        // El movimiento solo lo simula quien tiene la autoridad (quien la
-        // spawneo); en los demas clientes el NetworkTransform del prefab ya
-        // se encarga de mostrar la posicion replicada.
         if (!Object.HasStateAuthority || Consumed)
         {
             return;
@@ -87,7 +69,6 @@ public class BananaController : NetworkBehaviour
 
         if (next.y <= BananaRushConfig.GroundTopY)
         {
-            // Toco el piso sin que nadie la atrape: se pierde sin sumar ni restar puntos.
             DespawnSelf();
             return;
         }
@@ -108,10 +89,7 @@ public class BananaController : NetworkBehaviour
             return;
         }
 
-        // Se auto-protege adentro: solo el cliente due&#241;o de ESE jugador le va
-        // a tocar el puntaje. Este trigger puede disparar en varios clientes
-        // a la vez (cada uno simula fisica local de los proxies), por eso el
-        // pedido de despawn de abajo tambien esta protegido contra duplicados.
+        // El trigger corre en todos los clientes; ReceiveBananaHit se protege solo.
         if (IsStunPeel)
         {
             player.ApplyStun(StunSeconds > 0f ? StunSeconds : 3f);

@@ -1,11 +1,6 @@
 using Fusion;
 using UnityEngine;
 
-/// <summary>
-/// Mono en red. En Shared Mode cada cliente tiene State + Input Authority
-/// sobre su propio personaje. El ready, puntaje y eliminacion son
-/// [Networked]; el ready se declara con un RPC para que todos vean el aviso.
-/// </summary>
 [RequireComponent(typeof(SpriteRenderer))]
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(BoxCollider2D))]
@@ -418,7 +413,7 @@ public class PlayerController : NetworkBehaviour
         NetHorizontal = horizontal;
         NetGrounded = _grounded;
 
-        if (next.y <= _deathY)
+        if (next.y <= _deathY && BananaGameManager.Instance != null && BananaGameManager.Instance.MatchStarted)
         {
             Eliminate();
         }

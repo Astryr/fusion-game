@@ -4,9 +4,6 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-/// <summary>
-/// HUD: lobby con ready check, scoreboard, toasts, resultados.
-/// </summary>
 public class GameHUDController : MonoBehaviour
 {
     private const float ScoreboardRefreshInterval = 0.25f;
@@ -391,7 +388,8 @@ public class GameHUDController : MonoBehaviour
         if (manager.SelectedGame == MiniGameId.Parkour)
         {
             _endScreenText.fontSize = 30;
-            _endScreenText.text = BuildParkourResults();
+            string board = manager.ResultsBoard.ToString();
+            _endScreenText.text = string.IsNullOrEmpty(board) ? BuildParkourResults(manager.WinnerName.ToString()) : board;
         }
         else
         {
@@ -403,17 +401,21 @@ public class GameHUDController : MonoBehaviour
         _backToLobbyButton.gameObject.SetActive(canReturn);
     }
 
-    private static string BuildParkourResults()
+    private static string BuildParkourResults(string winnerName)
     {
         var players = Object.FindObjectsByType<PlayerController>(FindObjectsSortMode.None)
             .Where(p => p != null && p.IsSpawned)
             .ToArray();
         var finishers = players
-            .Where(p => !p.IsEliminated)
-            .OrderByDescending(p => p.Score)
+            .Where(p => !p.IsEliminated || (!string.IsNullOrEmpty(winnerName) && p.DisplayName == winnerName))
+            .OrderByDescending(p => !string.IsNullOrEmpty(winnerName) && p.DisplayName == winnerName)
+            .ThenByDescending(p => p.Score)
             .ThenByDescending(p => p.transform.position.x)
             .ToArray();
-        var fallen = players.Where(p => p.IsEliminated).Select(p => p.DisplayName).ToArray();
+        var fallen = players
+            .Where(p => p.IsEliminated && (string.IsNullOrEmpty(winnerName) || p.DisplayName != winnerName))
+            .Select(p => p.DisplayName)
+            .ToArray();
 
         var lines = new List<string>();
         string[] places = { "1er Lugar", "2do lugar", "3er lugar", "4to lugar" };

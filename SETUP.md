@@ -207,18 +207,13 @@ Dos formas, de más simple a más completa para esa persona:
 Cualquiera de las dos formas termina igual: cada uno conecta por su lado
 escribiendo **el mismo nombre de sala** (ej. `Sala1`) en la pantalla inicial.
 
-### Posible problema: región de Photon distinta
+### Region de Photon
 
-Este proyecto usa selección automática de "mejor región" (no hay una región
-fija configurada en `PhotonAppSettings`). Si los dos están en la misma zona
-geográfica, Photon normalmente les asigna la misma región solo y no van a
-notar nada. Pero si tu amigo está en otro país (o conecta por una red muy
-distinta — VPN, datos móviles, etc.), podría terminar en una región de
-Photon diferente a la tuya — y ahí, **aunque escriban el mismo nombre de
-sala, no se van a poder ver** (las salas son por región, no globales). Si
-sospechan que les está pasando esto, avisen para fijar una región fija en
-`Assets/Photon/Fusion/Resources/PhotonAppSettings.asset` (campo
-`FixedRegion`) y que los dos apunten siempre al mismo datacenter.
+Todas las PCs tienen que entrar a la **misma region**. El proyecto esta
+fijado a **`sa`** (Sao Paulo) en
+`Assets/Photon/Fusion/Resources/PhotonAppSettings.asset` (`FixedRegion`).
+Si ese dia `sa` no responde, cambialo a `us` en **todas** las maquinas
+(Editor y builds). Las salas no se ven entre regiones distintas.
 
 ### Cómo confirmar que funcionó
 
@@ -324,13 +319,9 @@ instalado en tu propia máquina:
 > pisarse cambios. Hacer `git pull origin main` seguido (sobre todo antes de
 > empezar a laburar) ayuda a evitar sorpresas.
 
-## Próximos pasos sugeridos (según el temario de la materia)
+## Temario cubierto
 
-- **JR6 (Sincronización e interacción)**: agregar más propiedades
-  `[Networked]` (vida, puntaje, estado) e interacciones entre jugadores
-  usando RPCs.
-- **JR7 (Sesiones y gestión de partidas)**: reemplazar el campo de texto
-  de sala por una lista de salas activas usando
-  `runner.JoinSessionLobby()` + `OnSessionListUpdated`.
-- Reemplazar el sprite/color placeholder por el arte y las mecánicas del
-  GDD.
+- **JR6**: propiedades `[Networked]` (fase, puntaje, ready, stun) e
+  interacciones por RPC (ready, consume de bananas, stun).
+- **JR7**: crear sala, listar salas abiertas (`JoinSessionLobby` +
+  `OnSessionListUpdated`) y property de sesion con el minijuego elegido.

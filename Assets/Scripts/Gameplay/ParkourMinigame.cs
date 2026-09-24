@@ -24,15 +24,18 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
 
     public void OnCountdownStarted()
     {
-        PrepareCourse();
+        PrepareCourse(hideLobbyGround: false);
         PlacePlayers(PlayerControlMode.Disabled, teleport: true);
+        StageBackdrop.BeginScrollingStage(BananaRushConfig.ParkourMinX, BananaRushConfig.ParkourMaxX);
     }
 
     public void OnMatchStarted()
     {
         if (!_courseReady)
         {
-            PrepareCourse();
+            PrepareCourse(hideLobbyGround: false);
+            PlacePlayers(PlayerControlMode.Disabled, teleport: true);
+            StageBackdrop.BeginScrollingStage(BananaRushConfig.ParkourMinX, BananaRushConfig.ParkourMaxX);
         }
 
         bool atStart = _director.MatchTime < 0.35f;
@@ -131,6 +134,13 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
     public void OnMatchEnded()
     {
         _started = false;
+        foreach (var player in _director.GetPlayers())
+        {
+            if (player != null && player.IsSpawned)
+            {
+                player.SetControlMode(PlayerControlMode.Disabled);
+            }
+        }
     }
 
     public void Cleanup()
@@ -178,7 +188,8 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
     {
         GameObject go = MiniGameWorld.SpriteObject(name, sprite, position, scale, "Ground", 1);
         go.layer = LayerMask.NameToLayer("Ground");
-        go.AddComponent<BoxCollider2D>();
+        var box = go.AddComponent<BoxCollider2D>();
+        box.size = Vector2.one;
     }
 
     private void UpdateAvalancheVisual()
@@ -203,7 +214,7 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
         wall.position = new Vector3(_director.AvalancheX - width * 0.35f, camY, 0f);
     }
 
-    private void PrepareCourse()
+    private void PrepareCourse(bool hideLobbyGround)
     {
         MiniGameWorld.Clear();
         _finishedIds.Clear();
@@ -216,7 +227,11 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
             cam.transform.position = new Vector3(BananaRushConfig.ParkourStartX + 4f, 4f, -10f);
         }
 
-        StageBackdrop.BeginScrollingStage(BananaRushConfig.ParkourMinX, BananaRushConfig.ParkourMaxX);
+        if (hideLobbyGround)
+        {
+            StageBackdrop.BeginScrollingStage(BananaRushConfig.ParkourMinX, BananaRushConfig.ParkourMaxX);
+        }
+
         if (_director.Object.HasStateAuthority)
         {
             _director.AvalancheX = BananaRushConfig.ParkourMinX - 2f;
@@ -236,7 +251,7 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
                 continue;
             }
 
-            if (teleport && _director.Object.HasStateAuthority)
+            if (teleport)
             {
                 float x = BananaRushConfig.ParkourStartX + 1.2f + i * 1.15f;
                 players[i].Teleport(new Vector3(x, BananaRushConfig.ParkourSpawnY, 0f));
