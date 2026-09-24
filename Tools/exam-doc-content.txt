@@ -1,0 +1,228 @@
+H1|Banana Rush — Resumen para el examen
+P|Juegos en Red. Evaluacion individual: como esta armado ESTE proyecto y como se ata a JR1–JR8.
+P|Grupo: Thiago Lima, Santino Jorge, Guadalupe Muiños y Facundo Batastini.
+P|Stack: Unity 6 (6000.3.23f1) + Photon Fusion 2 en Shared Mode. Region fija: sa (Sao Paulo).
+NOTE|Importante: las clases enseñan sobre todo Host Mode. Banana Rush usa Shared Mode. Si recitas Host y no aclaras Shared, te pueden cruzar.
+
+H1|1. No mezclar el modo de la materia con el del juego
+P|En Host Mode (clases JR3 a JR5) un jugador es Host, tiene State Authority de casi todo, y los demas mandan input y predicen.
+P|Banana Rush usa Shared Mode. No hay Host/Server. Photon Cloud conecta y hace matchmaking; la simulacion corre en cada PC. Cada NetworkObject tiene dueño (State Authority).
+TABLE|Pregunta|Host Mode (clases)|Banana Rush (Shared)
+ROW|Quien mueve tu mono|El Host aplica tu input|Vos: State + Input Authority de TU Player
+ROW|Quien dirige la ronda|El Host|El Master Client, dueño de BananaGameManager
+ROW|Si se va el jefe|Se corta o hay que migrar host|La autoridad del director migra (SharedModeStateAuthMasterClient)
+ROW|Prediccion / reconciliacion|Si, contra el Host|Casi no aplica a tu mono: lo simulas vos
+ROW|Lag Compensation|Host/Server + Hitboxes|No lo usamos (no esta en Shared)
+TABLEEND|
+NOTE|Frase lista: La materia se ve sobre todo en Host Mode. Nosotros usamos Shared porque es un party casual de 2 a 4, sin servidor dedicado. Cada uno es dueño de su personaje; el Master Client es dueño del director de partida.
+
+H1|2. Como clasificar Banana Rush (JR1)
+TABLE|Pregunta|Respuesta
+ROW|Loop|Menu → sala → lobby + ready → 5s → un minijuego → victoria → lobby
+ROW|Sincronico o asincronico|Sincronico: todos juegan al mismo tiempo
+ROW|Simetrico o asimetrico|Simetrico: todos el mismo rol (mono)
+ROW|Jugadores por partida|2 a 4
+ROW|Jugadores global|Los que entren a nuestra AppId (plan free, tope de CCU)
+ROW|Features online|Salas, lista, ready, 6 minijuegos, puntaje/Copa, desconexion
+ROW|Que se sincroniza|Posicion, nombre, color, ready, score, fase, bananas, stun, resultado
+ROW|Problemas|Region distinta, lag, alguien se va a mitad, late join
+ROW|Tech|Unity 6, Fusion 2 Shared, Photon Cloud, region sa
+TABLEEND|
+P|No es asincronico. No es asimetrico.
+P|El GDD largo hablaba de 10 rondas, eliminar cada 5 y mejor de 5. Eso no esta. Hoy cada partida es un minijuego. Al terminar se dan puntos de Copa 4-3-2-1 y se vuelve al lobby.
+
+H1|3. JR2 — Protocolos
+P|Modelo TCP/IP: Aplicacion → Transporte → Internet → Acceso a red.
+BULLET|Aplicacion: aca programamos. Fusion, puntaje, input, RPCs.
+BULLET|Transporte: TCP (confiable, ordenado, mas lento) vs UDP (rapido, puede perderse o desordenarse).
+BULLET|Internet: IP, routers, region de Photon.
+BULLET|Acceso: Wi-Fi, Ethernet, datos.
+P|Fusion y Photon Cloud usan UDP por debajo, con confiabilidad donde hace falta.
+BULLET|Movimiento / posicion: se puede perder un paquete; el proximo snapshot alcanza. Tipo UDP.
+BULLET|Ready, elegir minijuego, te toco la banana: tiene que llegar. Tipo evento confiable (RPC).
+NOTE|Frase: No elegimos TCP o UDP a mano. Fusion decide. Nosotros decidimos que es estado, que es input y que es RPC.
+
+H1|4. JR3 — Arquitectura
+P|Arquitectura = quien decide, quien guarda el estado, como se hablan los participantes.
+TABLE|Tipo|Hay servidor|Juega|Banana Rush
+ROW|P2P puro|No|Todos|No
+ROW|Host|Si (un jugador)|Si|No
+ROW|Dedicado|Si (maquina aparte)|No|No
+ROW|Shared (Fusion)|Cloud solo conecta|Todos juegan|Si
+TABLEEND|
+P|Photon Cloud NO ejecuta el juego. Solo conecta, salas, relay y region.
+P|Por que Shared y no Host: party casual, 2 a 4, sin infraestructura, mas facil de arrancar. Costo: menos control anti-cheat (un cliente podria mentir su score; para la entrega alcanza).
+NOTE|Master Client no es Host Mode. Master Client = lider de la sala Shared. Spawnea BananaGameManager y simula timers, lluvia, avalancha y fin de ronda.
+
+H1|5. JR4 — Photon y piezas del proyecto
+H2|Ecosistema
+P|Usamos Fusion (tiempo real). No Quantum, no Voice, no Chat, no PUN.
+P|La App de Photon no es el juego ni el servidor. Es el proyecto en la nube. Se identifica con el AppId en PhotonAppSettings. No es una contraseña, pero el repo es privado.
+P|CCU: usuarios concurrentes del plan free. Si la clase satura la misma AppId, no entra nadie.
+P|Region: FixedRegion = sa (Sao Paulo). Las salas son por region. Si una PC va a us y otra a sa, no se ven. Vacio = best region (peligroso en demo y examen).
+H2|NetworkRunner
+P|Un peer. Corre ticks, conexion, spawn y callbacks. En el menu hay dos runners:
+BULLET|browseRunner: entra al Lobby Shared solo para listar salas.
+BULLET|Runner: la Game Session de verdad.
+P|Un peer no esta a la vez en Lobby y en Session. Por eso se para el browse antes de StartGame.
+H2|Session, objetos y spawn
+P|Session: una partida. Se crea con StartGame + GameMode.Shared + nombre + PlayerCount = 4.
+P|NetworkObject: identidad en la simulacion. Lo tienen Player, Banana, BananaExplosiva y BananaGameManager. No lo tienen camara, HUD, menu, parallax ni el tablero del memotest (eso es local).
+P|Instantiate crea un GameObject solo en tu PC. Runner.Spawn crea un NetworkObject en Fusion y se replica.
+P|NetworkBehaviour: scripts de red (PlayerController, BananaController, BananaGameManager). UI, audio y visuales de minijuego son MonoBehaviour local.
+P|NetworkTransform replica el transform. El mono y las bananas lo usan.
+P|Tick no es Frame. El juego se dibuja en FPS; Fusion simula en ticks (FixedUpdateNetwork). El salto se bufferiza en Update porque GetKeyDown dura un frame y OnInput corre en el tick.
+P|NetworkSceneManagerDefault: todos cargan la escena Game juntos.
+
+H1|6. JR5 — Autoridad e input
+H2|Autoridad en Shared
+BULLET|Tu Player: este cliente tiene State Authority + Input Authority. Vos lo moves; los otros lo ven interpolado.
+BULLET|El Player del compañero: en tu PC es un proxy. No lo moves.
+BULLET|BananaGameManager: State Authority del Master Client.
+BULLET|Bananas: las spawnea el Master; el simula la caida. Los demas ven NetworkTransform.
+P|HasStateAuthority / HasInputAuthority / IsLocalPlayer se usan para no tocar lo que no es tuyo.
+H2|Input de red
+P|No mandamos "estoy en X=10". Mandamos intencion: NetworkInputData con Horizontal (A/D) y Buttons Jump/Action (Espacio).
+P|Flujo:
+BULLET|ProvideInput = true
+BULLET|Update: si apretas Espacio, se guarda (si no, el tick se lo pierde)
+BULLET|OnInput: arma el struct y input.Set(data)
+BULLET|PlayerController.FixedUpdateNetwork: GetInput y mueve / salta
+P|Eso es Network Input, no un RPC de movimiento.
+H2|Prediccion, reconciliacion, interpolacion
+P|Definiciones de la clase (Host Mode):
+BULLET|Prediction: no espero al Host para sentirme yo.
+BULLET|Reconciliation / resimulacion: el Host dijo otra cosa; vuelvo atras y resimulo.
+BULLET|Interpolation: veo suave al otro (entre snapshots).
+P|En nuestro Shared: tu mono responde ya porque vos sos la autoridad. Al compañero lo ves interpolado (NetworkTransform). No hay Lag Compensation ni rollback de Host.
+NOTE|Si preguntan si usamos prediccion: El input es el de Fusion. En Shared no predecimos contra un Host: cada uno simula su propio personaje. A los remotos los interpolamos.
+P|FixedUpdateNetwork es el lugar de la logica de simulacion. Efectos (sonido, popup +5) no son la verdad de la ronda.
+
+H1|7. JR6 — Sincronizacion e interaccion
+TABLE|Herramienta|Pregunta|En Banana Rush
+ROW|Network Input|Que quiere hacer el jugador|Mover, saltar, accion (pecho)
+ROW|[Networked]|Como esta el mundo ahora|Fase, score, ready, stun, resultado
+ROW|RPC|Que evento o pedido puntual|Estoy listo, cambiar minijuego, me pego la banana
+TABLEEND|
+H2|Estado del jugador (PlayerController)
+P|[Networked]: Score, CupScore, Nickname, IsReady, IsEliminated, IsStunned, Heat, StunUntil, color, direccion, grounded.
+P|Late join: un tercero recibe el estado actual (fase Playing, scores). No recibe los RPCs viejos.
+H2|Estado global (BananaGameManager)
+P|Fase: Lobby → Countdown → Playing → Results. Tambien: minijuego elegido, countdown, tiempo, tablero de resultados, overtime, avalancha, solo practice. Eso no vive en el Player: es de la partida.
+H2|Que es local (no va por red)
+P|Volumen/musica, HUD, menu, tablero del memotest (cada uno tiene el suyo), parallax, popups, Animator local a partir de Speed/Grounded replicados.
+H2|RPCs que hay que poder nombrar
+BULLET|Ready: el dueño del mono pide, se replica IsReady.
+BULLET|Cambiar minijuego: cualquiera pide, el Master escribe SelectedGame y cancela readys.
+BULLET|Banana: el trigger puede disparar en varias PCs; solo el dueño de ESE jugador se suma o resta puntos. Consumed evita el doble.
+BULLET|Stun de cascara y puntos de Copa.
+H2|Concurrencia
+P|Dos agarran la misma banana. Si cada uno decide, ambos suman. Solucion: un solo estado autoritativo (Consumed) + el hit se aplica una vez en el jugador dueño. Misma idea que el power-up de la diapo.
+P|Score = 25 es red. El texto +5 que vuela es local.
+
+H1|8. JR7 — Sesiones y gestion de partidas
+H2|Como se encuentran
+P|Tres formas de la clase; usamos dos:
+BULLET|Nombre de sala: creas o escribis el nombre y te unis.
+BULLET|Lobby + lista: al abrir el menu, un runner entra a SessionLobby.Shared. OnSessionListUpdated llena la lista: nombre, 2/4, minijuego. Click = join.
+BULLET|Quick Play / AutoHostOrClient: NO lo usamos.
+H2|Como se crea la Session
+P|StartGameArgs:
+BULLET|GameMode.Shared
+BULLET|SessionName (si esta vacio al crear: Sala + numero random)
+BULLET|PlayerCount = 4 (en Shared todos cuentan)
+BULLET|IsVisible = true: aparece en la lista
+BULLET|IsOpen = true: se puede entrar
+BULLET|EnableClientSessionCreation: crear vs solo unirse
+BULLET|SessionProperties: clave g = id del minijuego
+H2|Open no es Visible
+TABLE||Visible|Invisible
+ROW|Open|Se ve y se entra (nosotros)|No se ve; si sabes el nombre, podrias entrar
+ROW|Closed|Se ve, no entra nadie|No se ve y no entra
+TABLEEND|
+P|No cerramos ni ocultamos al empezar el minijuego. Se puede entrar tarde (late join). Si preguntan si deberian: se podria poner IsOpen = false al pasar a Playing; no lo hicimos.
+H2|Session Properties y Lobby
+P|Metadatos de la sala, no del GameObject. La clave g es el minijuego. La lista lo muestra. Si en el lobby lo cambian, se actualiza con UpdateCustomProperties.
+BULLET|Lobby = vitrina de salas. No se juega ahi.
+BULLET|Session = la partida.
+BULLET|No estas en los dos a la vez: por eso hay un browse runner aparte.
+H2|Salir y desconexion
+BULLET|Boton Salir: Runner.Shutdown, despues OnShutdown, y volves al menu (escena 0, SceneManager local).
+BULLET|OnPlayerLeft: se saca el Player de la red.
+BULLET|Si quedan 0, lobby. Si queda 1 en partida (y no es probar solo), gana el que quedo.
+P|No hay Quick Reconnect ni PlayerTTL. Si te vas, perdiste ese cuerpo; si volves, sos un player nuevo.
+
+H1|9. JR8 — Metricas, lag y lo que no implementamos
+TABLE|Concepto|Que es
+ROW|Ancho de banda|Cuantos datos por segundo aguanta el caño
+ROW|Latencia|Ida (un trayecto)
+ROW|RTT / ping|Ida y vuelta
+ROW|Jitter|La latencia cambia
+ROW|Packet loss|El paquete no llego
+ROW|Lag|Lo que SIENTE el jugador (sintoma, no una sola metrica)
+ROW|Tick Rate|Veces por segundo que Fusion SIMULA
+ROW|Send Rate|Veces que MANDA datos
+ROW|FPS|Frames de dibujo. No es tick ni ping
+TABLEEND|
+P|Trilema del netcode: consistencia vs respuesta vs no saturar la red. Sincronizamos lo necesario, no el mouse ni el volumen.
+P|Que hace Fusion en general: prediccion, reconciliacion, interpolacion.
+P|Que hacemos nosotros: interpolacion remota + input de red. No medimos RTT en el HUD. No activamos Fusion Statistics ni Network Conditions en el build de entrega.
+P|Lag Compensation: historial de Hitboxes para un raycast "le pegué a lo que yo veia". Solo Host/Server. NO ESTA. No hay hitscan: las bananas son triggers.
+NOTE|Si preguntan: No aplica. Shared no lo trae y no tenemos disparos instantaneos.
+P|Region sa = menos latencia para nosotros que eu. No elimina el lag; acorta el camino.
+
+H1|10. Mapa de archivos
+TABLE|Archivo|Para el examen
+ROW|NetworkRunnerHandler|Peer, connect, lobby browse, spawn del Player local, OnInput, leave
+ROW|NetworkInputData|Struct INetworkInput + NetworkButtons
+ROW|PlayerController|Authority del mono, score/ready, movimiento en FixedUpdateNetwork
+ROW|BananaGameManager|Estado global de la ronda (Master Client)
+ROW|BananaController|Objeto de red, caida en autoridad, consume
+ROW|MainMenuController|UI de crear / listar / unirse
+ROW|PhotonAppSettings|AppId + FixedRegion = sa
+TABLEEND|
+
+H1|11. Si te preguntan X, contesta Y
+H2|Photon Cloud es el servidor del juego?
+P|No. Conecta y organiza. El gameplay corre en las PCs. En Shared, cada objeto tiene dueño.
+H2|Por que no Host Mode si la materia lo usa?
+P|Host es mejor para estudiar cliente-servidor y anti-cheat. Shared entra mas rapido en un party 2 a 4. El Master Client cumple el rol de quien pisa el reloj.
+H2|Quien spawnea a los jugadores?
+P|Cada cliente a si mismo (player == LocalPlayer). En Host Mode lo haria solo el Host.
+H2|Quien spawnea bananas y termina la ronda?
+P|Master Client, dueño del BananaGameManager.
+H2|El memotest esta en red?
+P|El resultado si (quien termino primero, puntaje). El tablero es local: mismo set, distinto shuffle.
+H2|Alguien que entra tarde ve la ronda?
+P|Si, el estado [Networked]. No ve RPCs viejos.
+H2|TCP o UDP?
+P|Photon/Fusion sobre UDP, con confiabilidad selectiva. Movimiento tolera perdida; ready/RPC no.
+H2|Que pasa si se va uno?
+P|OnPlayerLeft limpia su mono. Si queda uno en Playing, gana. El que se fue vuelve al menu.
+H2|Matchmaking automatico?
+P|No. Nombre + lista. No AutoHostOrClient.
+H2|10 rondas y mejor de 5?
+P|Eso era el GDD largo. No esta. Un minijuego por partida, Copa 4-3-2-1, volves al lobby.
+H2|Simetrico? Sincronico?
+P|Si y si.
+
+H1|12. Cosas que NO digas que tenemos
+BULLET|Host Mode / servidor dedicado
+BULLET|Quick Play
+BULLET|Lag Compensation
+BULLET|Prediccion contra Host
+BULLET|Reconexion automatica
+BULLET|Cerrar la sala al empezar
+BULLET|Chat / voz
+BULLET|Copa de 10 rondas
+P|Si preguntan extras de JR8, responde la teoria y aclara: en el prototipo no lo medimos en HUD; Fusion Statistics y Network Conditions son de debug.
+
+H1|13. Gameplay breve
+BULLET|2 a 4 monos. Nombre + color. A/D o flechas, Espacio para saltar.
+BULLET|No arranca solo: todos ESTOY LISTO. Cuenta atras 5s.
+BULLET|Lluvia: +5 / explosiva -10 / verde +20. Gana a 100 o al corte de 30s.
+BULLET|Parkour: quietos, avalancha, si te caes ves al que va primero.
+BULLET|Tronco: se achica, empujones, cascaras 3s. Ultimo arriba.
+BULLET|Pecho: ritmo de Espacio. Si llega a rojo, fuera.
+BULLET|Memotest: tablero propio 6x3, 7s de peek, primero que complete.
+BULLET|Arbol: QTE, teclas rojas trampa, primero a 30.
