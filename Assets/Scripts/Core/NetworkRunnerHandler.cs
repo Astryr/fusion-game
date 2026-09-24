@@ -230,14 +230,25 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
 
         Debug.LogError($"[NetworkRunnerHandler] Fallo la conexion: {result.ShutdownReason}");
         OnConnectionFailedEvent?.Invoke(HumanizeShutdown(result.ShutdownReason));
+        DestroyRunner(Runner);
+        Runner = null;
+        return false;
+    }
 
-        if (Runner != null)
+    private void DestroyRunner(NetworkRunner runner)
+    {
+        if (runner == null)
         {
-            Destroy(Runner);
-            Runner = null;
+            return;
         }
 
-        return false;
+        var sceneManager = runner.GetComponent<NetworkSceneManagerDefault>();
+        if (sceneManager != null)
+        {
+            Destroy(sceneManager);
+        }
+
+        Destroy(runner);
     }
 
     private static string HumanizeShutdown(ShutdownReason reason)
@@ -371,7 +382,16 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         IsConnected = false;
         CurrentSessionName = null;
         _spawnedPlayers.Clear();
-        Runner = null;
+        if (Runner == runner)
+        {
+            Runner = null;
+        }
+
+        if (runner != null)
+        {
+            Destroy(runner);
+        }
+
         OnDisconnectedEvent?.Invoke();
     }
 
@@ -383,7 +403,9 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         OnConnectionFailedEvent?.Invoke(reason.ToString());
     }
 
+#pragma warning disable CS0618
     public void OnUserSimulationMessage(NetworkRunner runner, SimulationMessagePtr message) { }
+#pragma warning restore CS0618
     public void OnSessionListUpdated(NetworkRunner runner, List<SessionInfo> sessionList)
     {
         _availableSessions.Clear();

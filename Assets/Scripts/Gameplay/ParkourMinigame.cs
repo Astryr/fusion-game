@@ -168,8 +168,7 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
     {
         GameObject go = MiniGameWorld.SpriteObject(name, sprite, position, scale, "Ground", 1);
         go.layer = LayerMask.NameToLayer("Ground");
-        var collider = go.AddComponent<BoxCollider2D>();
-        collider.usedByComposite = false;
+        go.AddComponent<BoxCollider2D>();
     }
 
     private void UpdateAvalancheVisual()

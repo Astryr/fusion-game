@@ -17,6 +17,8 @@ bananas que caen desde arriba antes de que toquen el piso.
 - Al entrar se queda en el **lobby**. El juego **no arranca solo**: hace
   falta que haya al menos 2 jugadores y que **todos** apreten
   **ESTOY LISTO**. Recien ahi corre la cuenta regresiva.
+- Si estas testeando **sin compañeros**, el host tiene **PROBAR SOLO**:
+  con eso alcanza 1 jugador listo para arrancar el minijuego.
 - El host puede cambiar el minijuego desde el lobby (eso cancela los ready).
 - Cada mono tiene **color + nombre** arriba de la cabeza. Controles de
   movimiento: **A/D** o flechas, **Espacio** para saltar (o para el golpeo

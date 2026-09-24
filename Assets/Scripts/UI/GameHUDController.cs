@@ -24,6 +24,8 @@ public class GameHUDController : MonoBehaviour
     private Dropdown _lobbyGameDropdown;
     private Button _readyButton;
     private Text _readyButtonLabel;
+    private Button _soloButton;
+    private Text _soloButtonLabel;
 
     private GameObject _banner;
     private Text _bannerText;
@@ -146,7 +148,7 @@ public class GameHUDController : MonoBehaviour
     private void BuildLobby(Transform canvasTransform)
     {
         _lobbyPanel = UIFactory.CreatePanel(canvasTransform, "LobbyPanel", new Color(0.07f, 0.08f, 0.12f, 0.92f),
-            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-280, -210), new Vector2(280, 180)).gameObject;
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-300, -240), new Vector2(300, 200)).gameObject;
 
         _lobbyTitle = UIFactory.CreateTitleText(_lobbyPanel.transform, "LOBBY", 36, new Color(1f, 0.82f, 0.2f), new Color(0.25f, 0.12f, 0.05f));
         UIFactory.SetRect(_lobbyTitle.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(16, -70), new Vector2(-16, -8));
@@ -164,9 +166,15 @@ public class GameHUDController : MonoBehaviour
 
         _readyButton = UIFactory.CreateButton(_lobbyPanel.transform, "ESTOY LISTO", new Color(0.22f, 0.55f, 0.28f));
         UIFactory.SetRect(_readyButton.GetComponent<RectTransform>(),
-            new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(-130, 16), new Vector2(130, 58));
+            new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(-250, 18), new Vector2(-10, 58));
         _readyButton.onClick.AddListener(HandleReadyClicked);
         _readyButtonLabel = _readyButton.GetComponentInChildren<Text>();
+
+        _soloButton = UIFactory.CreateButton(_lobbyPanel.transform, "PROBAR SOLO", new Color(0.45f, 0.32f, 0.18f));
+        UIFactory.SetRect(_soloButton.GetComponent<RectTransform>(),
+            new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(10, 18), new Vector2(250, 58));
+        _soloButton.onClick.AddListener(HandleSoloClicked);
+        _soloButtonLabel = _soloButton.GetComponentInChildren<Text>();
     }
 
     private void BuildBanner(Transform canvasTransform)
@@ -246,10 +254,14 @@ public class GameHUDController : MonoBehaviour
 
         int readyCount = manager.ReadyCount();
         lines.Add(string.Empty);
-        lines.Add($"Ready {readyCount}/{players.Length}   |   minimo {MiniGameNames.MinPlayersToStart}   |   maximo {MiniGameNames.MaxPlayers}");
-        if (players.Length < MiniGameNames.MinPlayersToStart)
+        lines.Add($"Ready {readyCount}/{players.Length}   |   minimo {manager.MinPlayersToStart}   |   maximo {MiniGameNames.MaxPlayers}");
+        if (manager.AllowSoloPractice)
         {
-            lines.Add("Falta gente. El juego NO arranca solo.");
+            lines.Add("Modo prueba: con ESTOY LISTO arranca aunque estes solo.");
+        }
+        else if (players.Length < manager.MinPlayersToStart)
+        {
+            lines.Add("Falta gente. Si estas solo, usa PROBAR SOLO.");
         }
         else if (!manager.EveryoneReady())
         {
@@ -264,6 +276,16 @@ public class GameHUDController : MonoBehaviour
             bool ready = PlayerController.Local.IsReady;
             _readyButtonLabel.text = ready ? "CANCELAR READY" : "ESTOY LISTO";
             _readyButton.GetComponent<Image>().color = ready ? new Color(0.55f, 0.28f, 0.2f) : new Color(0.22f, 0.55f, 0.28f);
+        }
+
+        bool showSolo = isMaster;
+        _soloButton.gameObject.SetActive(showSolo);
+        if (showSolo && _soloButtonLabel != null)
+        {
+            _soloButtonLabel.text = manager.AllowSoloPractice ? "SOLO: ON" : "PROBAR SOLO";
+            _soloButton.GetComponent<Image>().color = manager.AllowSoloPractice
+                ? new Color(0.28f, 0.5f, 0.28f)
+                : new Color(0.45f, 0.32f, 0.18f);
         }
     }
 
@@ -331,7 +353,23 @@ public class GameHUDController : MonoBehaviour
         }
 
         string detail = manager.WinnerDetail.ToString();
-        _endScreenText.text = string.IsNullOrEmpty(detail) ? $"¡{winner} gana!" : $"¡{winner} gana!\n{detail}";
+        string cup = BuildCupStandings();
+        _endScreenText.text = string.IsNullOrEmpty(detail)
+            ? $"¡{winner} gana!\n{cup}"
+            : $"¡{winner} gana!\n{detail}\n{cup}";
+    }
+
+    private static string BuildCupStandings()
+    {
+        var players = FindObjectsByType<PlayerController>(FindObjectsSortMode.None)
+            .OrderByDescending(p => p.CupScore)
+            .ToArray();
+        if (players.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        return "Copa Banana: " + string.Join("  ·  ", players.Select(p => $"{p.DisplayName} {p.CupScore}"));
     }
 
     private void UpdateInfoExtra()
@@ -371,7 +409,7 @@ public class GameHUDController : MonoBehaviour
             Text row = GetOrCreateRow(i);
             string ready = players[i].IsReady ? " ✓" : string.Empty;
             string outMark = players[i].IsEliminated ? " OUT" : string.Empty;
-            row.text = $"{i + 1}. {players[i].DisplayName} - {players[i].Score}{ready}{outMark}";
+            row.text = $"{i + 1}. {players[i].DisplayName} - {players[i].Score}  (Copa {players[i].CupScore}){ready}{outMark}";
             row.color = players[i].IsEliminated ? new Color(1f, 0.5f, 0.45f) : Color.white;
             row.gameObject.SetActive(true);
         }
@@ -412,6 +450,17 @@ public class GameHUDController : MonoBehaviour
     private void HandleReadyClicked()
     {
         PlayerController.Local?.RequestToggleReady();
+    }
+
+    private void HandleSoloClicked()
+    {
+        var manager = BananaGameManager.Instance;
+        if (manager == null || !manager.Object.HasStateAuthority)
+        {
+            return;
+        }
+
+        manager.SetSoloPractice(!manager.AllowSoloPractice);
     }
 
     private void HandleToast(string message, Color color)

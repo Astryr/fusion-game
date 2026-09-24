@@ -145,65 +145,80 @@ public static class UIFactory
 
     public static Dropdown CreateDropdown(Transform parent, IList<string> options, int selectedIndex = 0)
     {
-        var go = new GameObject("Dropdown", typeof(Image), typeof(Dropdown));
-        go.transform.SetParent(parent, false);
-        go.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.95f);
+        var root = new GameObject("Dropdown", typeof(RectTransform), typeof(Image), typeof(Dropdown));
+        root.transform.SetParent(parent, false);
+        root.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.95f);
 
-        var label = CreateText(go.transform, options.Count > 0 ? options[0] : string.Empty, 16, TextAnchor.MiddleLeft, new Color(0.1f, 0.1f, 0.1f));
-        SetRect(label.rectTransform, Vector2.zero, Vector2.one, new Vector2(10, 4), new Vector2(-28, -4));
+        Text caption = CreateText(root.transform, options.Count > 0 ? options[0] : string.Empty, 16, TextAnchor.MiddleLeft, new Color(0.1f, 0.1f, 0.1f));
+        caption.raycastTarget = false;
+        SetRect(caption.rectTransform, Vector2.zero, Vector2.one, new Vector2(10, 4), new Vector2(-28, -4));
 
-        var arrow = CreateText(go.transform, "▼", 12, TextAnchor.MiddleCenter, new Color(0.2f, 0.2f, 0.2f));
+        Text arrow = CreateText(root.transform, "v", 14, TextAnchor.MiddleCenter, new Color(0.2f, 0.2f, 0.2f));
+        arrow.raycastTarget = false;
         SetRect(arrow.rectTransform, new Vector2(1, 0), new Vector2(1, 1), new Vector2(-26, 0), new Vector2(-4, 0));
 
-        var template = new GameObject("Template", typeof(Image), typeof(ScrollRect));
-        template.transform.SetParent(go.transform, false);
+        var template = new GameObject("Template", typeof(RectTransform), typeof(Image), typeof(ScrollRect));
+        template.transform.SetParent(root.transform, false);
         template.GetComponent<Image>().color = new Color(0.95f, 0.95f, 0.95f, 1f);
-        var templateRect = template.GetComponent<RectTransform>();
-        SetRect(templateRect, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, -140), new Vector2(0, 0));
-        template.SetActive(false);
+        RectTransform templateRect = template.GetComponent<RectTransform>();
+        templateRect.anchorMin = new Vector2(0f, 0f);
+        templateRect.anchorMax = new Vector2(1f, 0f);
+        templateRect.pivot = new Vector2(0.5f, 1f);
+        templateRect.anchoredPosition = Vector2.zero;
+        templateRect.sizeDelta = new Vector2(0f, 150f);
 
-        var viewport = new GameObject("Viewport", typeof(Image), typeof(Mask));
+        var viewport = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
         viewport.transform.SetParent(template.transform, false);
         viewport.GetComponent<Image>().color = Color.white;
         viewport.GetComponent<Mask>().showMaskGraphic = false;
-        var viewportRect = viewport.GetComponent<RectTransform>();
-        SetRect(viewportRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        SetRect(viewport.GetComponent<RectTransform>(), Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
         var content = new GameObject("Content", typeof(RectTransform));
         content.transform.SetParent(viewport.transform, false);
-        var contentRect = content.GetComponent<RectTransform>();
-        contentRect.anchorMin = new Vector2(0, 1);
-        contentRect.anchorMax = new Vector2(1, 1);
+        RectTransform contentRect = content.GetComponent<RectTransform>();
+        contentRect.anchorMin = new Vector2(0f, 1f);
+        contentRect.anchorMax = new Vector2(1f, 1f);
         contentRect.pivot = new Vector2(0.5f, 1f);
-        contentRect.sizeDelta = new Vector2(0, 32);
+        contentRect.anchoredPosition = Vector2.zero;
+        contentRect.sizeDelta = new Vector2(0f, 28f);
 
-        var item = new GameObject("Item", typeof(Toggle));
+        var item = new GameObject("Item", typeof(RectTransform), typeof(Toggle), typeof(Image));
         item.transform.SetParent(content.transform, false);
-        var itemRect = item.AddComponent<RectTransform>();
-        itemRect.anchorMin = new Vector2(0, 0.5f);
-        itemRect.anchorMax = new Vector2(1, 0.5f);
-        itemRect.sizeDelta = new Vector2(0, 28);
+        RectTransform itemRect = item.GetComponent<RectTransform>();
+        itemRect.anchorMin = new Vector2(0f, 0.5f);
+        itemRect.anchorMax = new Vector2(1f, 0.5f);
+        itemRect.pivot = new Vector2(0.5f, 0.5f);
+        itemRect.anchoredPosition = Vector2.zero;
+        itemRect.sizeDelta = new Vector2(0f, 28f);
 
-        var itemBg = item.AddComponent<Image>();
-        itemBg.color = new Color(0.9f, 0.9f, 0.9f, 1f);
-        var toggle = item.GetComponent<Toggle>();
-        toggle.targetGraphic = itemBg;
+        Image itemBackground = item.GetComponent<Image>();
+        itemBackground.color = new Color(0.9f, 0.9f, 0.9f, 1f);
 
-        var itemLabel = CreateText(item.transform, "Opcion", 15, TextAnchor.MiddleLeft, new Color(0.1f, 0.1f, 0.1f));
-        SetRect(itemLabel.rectTransform, Vector2.zero, Vector2.one, new Vector2(8, 0), new Vector2(-8, 0));
+        Toggle toggle = item.GetComponent<Toggle>();
+        toggle.targetGraphic = itemBackground;
+        toggle.isOn = true;
 
-        var dropdown = go.GetComponent<Dropdown>();
-        dropdown.captionText = label;
+        Text itemLabel = CreateText(item.transform, "Opcion", 15, TextAnchor.MiddleLeft, new Color(0.1f, 0.1f, 0.1f));
+        itemLabel.raycastTarget = false;
+        SetRect(itemLabel.rectTransform, Vector2.zero, Vector2.one, new Vector2(8f, 0f), new Vector2(-8f, 0f));
+
+        ScrollRect scrollRect = template.GetComponent<ScrollRect>();
+        scrollRect.content = contentRect;
+        scrollRect.viewport = viewport.GetComponent<RectTransform>();
+        scrollRect.horizontal = false;
+        scrollRect.movementType = ScrollRect.MovementType.Clamped;
+
+        Dropdown dropdown = root.GetComponent<Dropdown>();
+        dropdown.targetGraphic = root.GetComponent<Image>();
+        dropdown.captionText = caption;
         dropdown.itemText = itemLabel;
         dropdown.template = templateRect;
-        dropdown.options.Clear();
-        foreach (string option in options)
-        {
-            dropdown.options.Add(new Dropdown.OptionData(option));
-        }
-
+        dropdown.ClearOptions();
+        dropdown.AddOptions(new List<string>(options));
         dropdown.value = Mathf.Clamp(selectedIndex, 0, Mathf.Max(0, options.Count - 1));
         dropdown.RefreshShownValue();
+
+        template.SetActive(false);
         return dropdown;
     }
 

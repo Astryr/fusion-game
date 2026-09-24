@@ -143,6 +143,7 @@ public class MainMenuController : MonoBehaviour
         if (!success)
         {
             SetBusy(false, null);
+            await handler.StartBrowsingAsync();
         }
     }
 
@@ -166,6 +167,7 @@ public class MainMenuController : MonoBehaviour
         if (!success)
         {
             SetBusy(false, null);
+            await handler.StartBrowsingAsync();
         }
     }
 
@@ -197,6 +199,7 @@ public class MainMenuController : MonoBehaviour
         if (!success)
         {
             SetBusy(false, null);
+            await handler.StartBrowsingAsync();
         }
     }
 

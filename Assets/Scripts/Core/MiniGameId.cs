@@ -18,6 +18,7 @@ public static class MiniGameNames
     public const string SessionPropertyKey = "g";
     public const int MaxPlayers = 4;
     public const int MinPlayersToStart = 2;
+    public const int SoloPracticeMinPlayers = 1;
 
     public static readonly string[] DisplayNames =
     {

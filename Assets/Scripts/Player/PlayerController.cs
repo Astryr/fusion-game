@@ -25,6 +25,7 @@ public class PlayerController : NetworkBehaviour
     [Networked] private float NetHorizontal { get; set; }
     [Networked] private NetworkBool NetGrounded { get; set; }
     [Networked] public int Score { get; set; }
+    [Networked] public int CupScore { get; set; }
     [Networked] public NetworkString<_32> Nickname { get; set; }
     [Networked] public NetworkBool IsReady { get; set; }
     [Networked] public NetworkBool IsEliminated { get; set; }
@@ -447,6 +448,12 @@ public class PlayerController : NetworkBehaviour
     public void RPC_SetScore(int score)
     {
         Score = score;
+    }
+
+    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+    public void RPC_AddCupScore(int points)
+    {
+        CupScore = Mathf.Max(0, CupScore + points);
     }
 
     private void ResolveGround(ref Vector3 next)

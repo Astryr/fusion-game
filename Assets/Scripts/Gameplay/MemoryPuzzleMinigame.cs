@@ -167,7 +167,6 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
         UIFactory.SetRect(_status.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(8, 8), new Vector2(-8, 44));
 
         const float pad = 18f;
-        const float top = 52f;
         float cell = (420f - pad * 2f) / Size;
         for (int y = 0; y < Size; y++)
         {

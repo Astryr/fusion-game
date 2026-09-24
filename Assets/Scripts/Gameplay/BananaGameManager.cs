@@ -14,7 +14,9 @@ public class BananaGameManager : NetworkBehaviour
 
     [SerializeField] private float _countdownDuration = 5f;
 
-    public int MinPlayersToStart => MiniGameNames.MinPlayersToStart;
+    [Networked] public NetworkBool AllowSoloPractice { get; set; }
+
+    public int MinPlayersToStart => AllowSoloPractice ? MiniGameNames.SoloPracticeMinPlayers : MiniGameNames.MinPlayersToStart;
 
     [Networked] public MatchPhase Phase { get; set; }
     [Networked] public MiniGameId SelectedGame { get; set; }
@@ -52,6 +54,11 @@ public class BananaGameManager : NetworkBehaviour
 
         _renderedPhase = Phase;
         _renderedGame = SelectedGame;
+        if (Phase == MatchPhase.Playing)
+        {
+            _active = FindMinigame(SelectedGame);
+            _active?.OnMatchStarted();
+        }
     }
 
     public override void Despawned(NetworkRunner runner, bool hasState)
@@ -100,6 +107,12 @@ public class BananaGameManager : NetworkBehaviour
         if (Phase == MatchPhase.Playing)
         {
             MatchTime += Runner.DeltaTime;
+            HandleDisconnectDuringMatch();
+            if (Phase != MatchPhase.Playing)
+            {
+                return;
+            }
+
             _active?.Tick(Runner.DeltaTime, true);
         }
     }
@@ -131,7 +144,7 @@ public class BananaGameManager : NetworkBehaviour
     public bool EveryoneReady()
     {
         var players = GetPlayers();
-        if (players.Length < MiniGameNames.MinPlayersToStart)
+        if (players.Length < MinPlayersToStart)
         {
             return false;
         }
@@ -145,6 +158,17 @@ public class BananaGameManager : NetworkBehaviour
         }
 
         return true;
+    }
+
+    public void SetSoloPractice(bool enabled)
+    {
+        if (!Object.HasStateAuthority || Phase != MatchPhase.Lobby)
+        {
+            return;
+        }
+
+        AllowSoloPractice = enabled;
+        RPC_ShowFeedback(enabled ? "Modo prueba: podes arrancar solo" : "Modo normal: minimo 2 listos", 1);
     }
 
     public void SetSelectedGame(MiniGameId id)
@@ -293,7 +317,7 @@ public class BananaGameManager : NetworkBehaviour
 
     private void UpdateCountdown()
     {
-        if (!EveryoneReady() || ConnectedPlayerCount() < MiniGameNames.MinPlayersToStart)
+        if (!EveryoneReady() || ConnectedPlayerCount() < MinPlayersToStart)
         {
             Phase = MatchPhase.Lobby;
             CountdownRemaining = -1f;
@@ -333,8 +357,50 @@ public class BananaGameManager : NetworkBehaviour
         string name = winner != null ? winner.DisplayName : "Nadie";
         WinnerName = name;
         WinnerDetail = string.IsNullOrEmpty(detail) ? "Ganador" : detail;
+        AwardCupPoints();
         Phase = MatchPhase.Results;
         RPC_ShowFeedback($"{name} gana", 0);
+    }
+
+    private void AwardCupPoints()
+    {
+        var ranked = new List<PlayerController>(GetPlayers());
+        ranked.Sort((a, b) =>
+        {
+            int eliminated = ((bool)a.IsEliminated).CompareTo((bool)b.IsEliminated);
+            if (eliminated != 0)
+            {
+                return eliminated;
+            }
+
+            return b.Score.CompareTo(a.Score);
+        });
+
+        for (int i = 0; i < ranked.Count; i++)
+        {
+            int cup = Mathf.Clamp(4 - i, 1, 4);
+            ranked[i].RPC_AddCupScore(cup);
+        }
+    }
+
+    private void HandleDisconnectDuringMatch()
+    {
+        var players = GetPlayers();
+        if (AllowSoloPractice)
+        {
+            return;
+        }
+
+        if (players.Length == 0)
+        {
+            ReturnToLobby();
+            return;
+        }
+
+        if (players.Length == 1 && MatchTime > 1f)
+        {
+            FinishMatch(players[0], "el resto se desconecto");
+        }
     }
 
     private void ResetPlayersForLobby()
