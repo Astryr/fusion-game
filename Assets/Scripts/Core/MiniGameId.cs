@@ -26,7 +26,7 @@ public static class MiniGameNames
         "Parkour de la jungla",
         "Tronco gigante",
         "Golpeo de pecho",
-        "Puzzle de la jungla",
+        "Memotest de la jungla",
         "Rompe el arbol",
     };
 
@@ -36,7 +36,7 @@ public static class MiniGameNames
         "Corre a la meta. Si te come la avalancha, quedas fuera.",
         "Quedate en el tronco. Empuja a los demas y cuidado con las cascaras.",
         "Spamea ESPACIO con ritmo. Si te pasas, el pecho se pone rojo y perdes.",
-        "Memoriza el cuadro 4x4. Una ficha mal mueve otra que estaba bien.",
+        "Tablero compartido. En tu turno da vuelta 2 fichas. Pareja = 1 punto y repetis.",
         "Apreta la tecla que aparece. Las rojas son trampa. Primero a 30 gana.",
     };
 

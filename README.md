@@ -33,7 +33,8 @@ bananas que caen desde arriba antes de que toquen el piso.
     cascaras que aturden 3s.
   - **Golpeo de pecho**: spam de Espacio con ritmo. Si el calor llega a
     rojo, perdes.
-  - **Puzzle 4x4**: memoriza el cuadro. Una ficha mal mueve otra correcta.
+  - **Memotest 4x4**: tablero compartido. En tu turno das vuelta 2 fichas;
+    si son pareja sumas 1 y repetis. Gana quien tenga mas parejas.
   - **Rompe el arbol**: QTE de teclas. Las rojas son trampa. Primero a 30.
 - Al terminar se ve el ganador y **Volver al lobby** para otra ronda.
 

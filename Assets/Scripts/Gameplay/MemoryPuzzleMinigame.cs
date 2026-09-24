@@ -1,25 +1,29 @@
 using UnityEngine;
 using UnityEngine.UI;
 
+/// <summary>
+/// Memotest compartido 4x4. Todos ven el mismo tablero; por turnos
+/// cada jugador da vuelta dos fichas. Pareja = 1 punto y sigue jugando.
+/// </summary>
 public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
 {
     public MiniGameId Id => MiniGameId.MemoryPuzzle;
 
-    private const int Size = 4;
-    private const float PreviewSeconds = 5f;
+    public const int Size = 4;
+    public const int CellCount = Size * Size;
+    public const float PeekSeconds = 3f;
+    public const float MismatchSeconds = 1.15f;
+    public const float TurnTimeout = 18f;
 
     private BananaGameManager _director;
     private Canvas _canvas;
     private Text _status;
-    private readonly Image[] _cells = new Image[Size * Size];
-    private readonly int[] _target = new int[Size * Size];
-    private readonly int[] _board = new int[Size * Size];
-    private readonly bool[] _locked = new bool[Size * Size];
-    private int _cursor;
+    private readonly Image[] _cells = new Image[CellCount];
     private bool _playing;
-    private bool _preview;
-    private bool _localFinished;
     private Sprite[] _pieceSprites;
+
+    private static int _cachedSeed = int.MinValue;
+    private static readonly int[] Layout = new int[CellCount];
 
     public void Setup(BananaGameManager director)
     {
@@ -28,18 +32,20 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
 
     public void OnMatchStarted()
     {
-        _localFinished = false;
         _playing = true;
-        _preview = true;
-        _cursor = 0;
         LoadSprites();
-        BuildTarget();
+        EnsureLayout(_director.RoundSeed);
         BuildUI();
-        RefreshCells(true);
+        RefreshCells();
 
         foreach (var player in _director.GetPlayers())
         {
             player.SetControlMode(PlayerControlMode.Disabled);
+        }
+
+        if (_director.Object.HasStateAuthority)
+        {
+            _director.ResetPuzzleState();
         }
     }
 
@@ -50,44 +56,13 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
             return;
         }
 
-        if (_preview)
-        {
-            if (!hasAuthority && _status != null)
-            {
-                int left = Mathf.CeilToInt(Mathf.Max(0f, PreviewSeconds - _director.MatchTime));
-                _status.text = $"Memoriza el cuadro... {left}";
-            }
-
-            if (_director.MatchTime >= PreviewSeconds && _preview)
-            {
-                _preview = false;
-                ScrambleBoard();
-                RefreshCells(false);
-                if (_status != null)
-                {
-                    _status.text = "Reconstruilo. Click = colocar la siguiente pieza.";
-                }
-            }
-
-            return;
-        }
-
         if (hasAuthority)
         {
-            foreach (var player in _director.GetPlayers())
-            {
-                if (player.Score >= 16)
-                {
-                    _director.DeclareWinner(player, "armo el cuadro");
-                    return;
-                }
-            }
-
-            if (_director.MatchTime >= 70f)
-            {
-                _director.DeclareHighestScoreWinner("mas fichas correctas");
-            }
+            _director.TickPuzzle(PeekSeconds, TurnTimeout);
         }
+
+        RefreshCells();
+        RefreshStatus();
     }
 
     public void OnMatchEnded()
@@ -105,6 +80,38 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
         }
     }
 
+    public static int PieceAt(int seed, int index)
+    {
+        EnsureLayout(seed);
+        if (index < 0 || index >= CellCount)
+        {
+            return 0;
+        }
+
+        return Layout[index];
+    }
+
+    private static void EnsureLayout(int seed)
+    {
+        if (_cachedSeed == seed)
+        {
+            return;
+        }
+
+        _cachedSeed = seed;
+        for (int i = 0; i < CellCount; i++)
+        {
+            Layout[i] = (i / 2) % 4;
+        }
+
+        var rng = new System.Random(seed);
+        for (int i = CellCount - 1; i > 0; i--)
+        {
+            int j = rng.Next(i + 1);
+            (Layout[i], Layout[j]) = (Layout[j], Layout[i]);
+        }
+    }
+
     private void LoadSprites()
     {
         _pieceSprites = new[]
@@ -114,42 +121,6 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
             SpriteFromScene("GrassTop"),
             SpriteFromScene("DirtFill"),
         };
-    }
-
-    private void BuildTarget()
-    {
-        var rng = new System.Random(_director.RoundSeed + (PlayerController.Local != null ? PlayerController.Local.Object.InputAuthority.PlayerId : 0));
-        for (int i = 0; i < _target.Length; i++)
-        {
-            _target[i] = i % 4;
-            _board[i] = _target[i];
-            _locked[i] = false;
-        }
-
-        for (int i = _target.Length - 1; i > 0; i--)
-        {
-            int j = rng.Next(i + 1);
-            (_target[i], _target[j]) = (_target[j], _target[i]);
-            _board[i] = _target[i];
-        }
-    }
-
-    private void ScrambleBoard()
-    {
-        var rng = new System.Random(_director.RoundSeed + 99);
-        for (int i = 0; i < _board.Length; i++)
-        {
-            _board[i] = -1;
-            _locked[i] = false;
-        }
-
-        // Deja 4 fichas puestas al azar para que no arranque vacio.
-        for (int n = 0; n < 4; n++)
-        {
-            int index = rng.Next(_board.Length);
-            _board[index] = _target[index];
-            _locked[index] = true;
-        }
     }
 
     private void BuildUI()
@@ -163,7 +134,7 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
         var panel = UIFactory.CreatePanel(_canvas.transform, "PuzzlePanel", new Color(0.08f, 0.09f, 0.12f, 0.82f),
             new Vector2(0.5f, 0.42f), new Vector2(0.5f, 0.42f), new Vector2(-210, -210), new Vector2(210, 210));
 
-        _status = UIFactory.CreateText(panel, "Memoriza el cuadro", 16, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.35f));
+        _status = UIFactory.CreateText(panel, "Memotest", 16, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.35f));
         UIFactory.SetRect(_status.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(8, 8), new Vector2(-8, 44));
 
         const float pad = 18f;
@@ -192,76 +163,64 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
 
     private void HandleCellClicked(int index)
     {
-        if (!_playing || _preview || _localFinished || _locked[index])
+        if (!_playing || _director == null || PlayerController.Local == null)
         {
             return;
         }
 
-        int piece = _cursor % 4;
-        _board[index] = piece;
-        if (_board[index] == _target[index])
+        if (_director.MatchTime < PeekSeconds)
         {
-            _locked[index] = true;
-            _cursor++;
-            RefreshCells(false);
-            UpdateLocalScore();
-            if (CountCorrect() >= 16)
-            {
-                _localFinished = true;
-                if (PlayerController.Local != null)
-                {
-                    PlayerController.Local.RPC_SetScore(16);
-                }
+            return;
+        }
 
-                _director.RPC_ShowFeedback($"{PlayerController.Local.DisplayName} completo el puzzle", 0);
-            }
+        if (!_director.IsLocalPuzzleTurn())
+        {
+            GameFeedback.Toast("Todavia no es tu turno", new Color(1f, 0.75f, 0.4f));
+            return;
+        }
+
+        _director.RPC_RequestPuzzleFlip(index, PlayerController.Local.Object.InputAuthority);
+    }
+
+    private void RefreshStatus()
+    {
+        if (_status == null || _director == null)
+        {
+            return;
+        }
+
+        if (_director.MatchTime < PeekSeconds)
+        {
+            int left = Mathf.CeilToInt(Mathf.Max(0f, PeekSeconds - _director.MatchTime));
+            _status.text = $"Mira el tablero... {left}";
+            _status.color = new Color(1f, 0.85f, 0.35f);
+            return;
+        }
+
+        if (_director.PuzzleRevealUntil >= 0f && _director.MatchTime < _director.PuzzleRevealUntil)
+        {
+            _status.text = "No era pareja";
+            _status.color = new Color(1f, 0.5f, 0.4f);
+            return;
+        }
+
+        PlayerController turn = _director.FindPlayerById(_director.PuzzleTurnId);
+        string name = turn != null ? turn.DisplayName : "alguien";
+        if (_director.IsLocalPuzzleTurn())
+        {
+            _status.text = "Tu turno: da vuelta 2 fichas iguales";
+            _status.color = new Color(0.55f, 1f, 0.6f);
         }
         else
         {
-            NudgeACorrectPiece();
-            RefreshCells(false);
-            UpdateLocalScore();
-            GameFeedback.Toast("Ficha mal: se movio otra que estaba bien", new Color(1f, 0.5f, 0.4f));
+            _status.text = $"Turno de {name}";
+            _status.color = new Color(0.85f, 0.86f, 0.9f);
         }
     }
 
-    private void NudgeACorrectPiece()
+    private void RefreshCells()
     {
-        for (int i = 0; i < _locked.Length; i++)
-        {
-            if (_locked[i])
-            {
-                _locked[i] = false;
-                _board[i] = (_target[i] + 1) % 4;
-                return;
-            }
-        }
-    }
-
-    private void UpdateLocalScore()
-    {
-        if (PlayerController.Local != null)
-        {
-            PlayerController.Local.RPC_SetScore(CountCorrect());
-        }
-    }
-
-    private int CountCorrect()
-    {
-        int count = 0;
-        for (int i = 0; i < _board.Length; i++)
-        {
-            if (_board[i] == _target[i])
-            {
-                count++;
-            }
-        }
-
-        return count;
-    }
-
-    private void RefreshCells(bool showTarget)
-    {
+        bool peek = _director != null && _director.MatchTime < PeekSeconds;
         for (int i = 0; i < _cells.Length; i++)
         {
             if (_cells[i] == null)
@@ -269,11 +228,20 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
                 continue;
             }
 
-            int value = showTarget ? _target[i] : _board[i];
-            if (value < 0 || _pieceSprites == null || value >= _pieceSprites.Length || _pieceSprites[value] == null)
+            bool show = peek ||
+                        (_director != null && (_director.IsPuzzleCellLocked(i) || _director.IsPuzzleCellFlipped(i)));
+            if (!show)
             {
                 _cells[i].sprite = null;
-                _cells[i].color = value < 0 ? new Color(0.15f, 0.16f, 0.18f) : ColorFor(value);
+                _cells[i].color = new Color(0.16f, 0.17f, 0.2f, 1f);
+                continue;
+            }
+
+            int value = PieceAt(_director.RoundSeed, i);
+            if (_pieceSprites == null || value < 0 || value >= _pieceSprites.Length || _pieceSprites[value] == null)
+            {
+                _cells[i].sprite = null;
+                _cells[i].color = ColorFor(value);
             }
             else
             {
