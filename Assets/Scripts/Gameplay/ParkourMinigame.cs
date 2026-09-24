@@ -34,6 +34,8 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
             cam.orthographicSize = 6.5f;
         }
 
+        StageBackdrop.BeginScrollingStage(BananaRushConfig.ParkourMinX, BananaRushConfig.ParkourMaxX);
+
         var players = _director.GetPlayers();
         for (int i = 0; i < players.Length; i++)
         {
@@ -122,8 +124,12 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
             }
         }
 
-        UpdateAvalancheVisual();
         FollowLocalPlayer();
+        UpdateAvalancheVisual();
+        if (Camera.main != null)
+        {
+            StageBackdrop.Tick(Camera.main.transform.position);
+        }
     }
 
     public void OnMatchEnded()
@@ -135,6 +141,7 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
     {
         _started = false;
         MiniGameWorld.Clear();
+        StageBackdrop.Clear();
         Camera cam = Camera.main;
         if (cam != null)
         {
@@ -151,16 +158,22 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
             platform = CreateFallbackSprite(new Color(0.45f, 0.32f, 0.18f));
         }
 
-        PlacePlatform("Start", new Vector3(-2f, 0f, 0f), new Vector3(8f, 1f, 1f), platform);
-        float[] xs = { 6f, 11f, 16.5f, 22f, 27.5f, 33f, 38f };
-        float[] ys = { 0.4f, 1.6f, 0.2f, 1.8f, 0.6f, 1.4f, 0.3f };
-        for (int i = 0; i < xs.Length; i++)
+        PlacePlatform("Start", new Vector3(BananaRushConfig.ParkourStartX + 2f, 0f, 0f), new Vector3(10f, 1f, 1f), platform);
+
+        float x = 6.2f;
+        int index = 0;
+        while (x < BananaRushConfig.ParkourFinishX - 5f)
         {
-            PlacePlatform($"Plat_{i}", new Vector3(xs[i], ys[i], 0f), new Vector3(3.4f, 0.7f, 1f), platform);
+            float y = 0.2f + Mathf.Abs(Mathf.Sin(index * 1.35f)) * 1.7f;
+            float width = 3.15f + (index % 3) * 0.3f;
+            PlacePlatform($"Plat_{index}", new Vector3(x, y, 0f), new Vector3(width, 0.7f, 1f), platform);
+            x += 4.7f + (index % 4) * 0.28f;
+            index++;
         }
 
+        PlacePlatform("FinishPad", new Vector3(BananaRushConfig.ParkourFinishX, 0.15f, 0f), new Vector3(7f, 0.85f, 1f), platform);
         GameObject finish = MiniGameWorld.SpriteObject("Finish", _flagSprite != null ? _flagSprite : platform,
-            new Vector3(BananaRushConfig.ParkourFinishX, 2.4f, 0f), Vector3.one, "Props", 5);
+            new Vector3(BananaRushConfig.ParkourFinishX, 2.5f, 0f), Vector3.one, "Props", 5);
         finish.name = "FinishFlag";
     }
 
@@ -173,18 +186,24 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
 
     private void UpdateAvalancheVisual()
     {
+        Camera cam = Camera.main;
+        float camY = cam != null ? cam.transform.position.y : 4f;
+        float height = cam != null ? cam.orthographicSize * 2.6f : 20f;
+        float width = BananaRushConfig.ParkourAvalancheWidth;
+
         Transform root = MiniGameWorld.GetRoot();
         Transform wall = root.Find("Avalanche");
         if (wall == null)
         {
-            Sprite dirt = _dirtSprite != null ? _dirtSprite : CreateFallbackSprite(new Color(0.35f, 0.12f, 0.08f));
-            GameObject go = MiniGameWorld.SpriteObject("Avalanche", dirt, Vector3.zero, new Vector3(3.5f, 16f, 1f), "Props", 8);
+            Sprite slab = CreateFallbackSprite(Color.white);
+            GameObject go = MiniGameWorld.SpriteObject("Avalanche", slab, Vector3.zero, Vector3.one, "Props", 12);
             var renderer = go.GetComponent<SpriteRenderer>();
-            renderer.color = new Color(0.75f, 0.15f, 0.1f, 0.85f);
+            renderer.color = new Color(1f, 1f, 1f, 0.94f);
             wall = go.transform;
         }
 
-        wall.position = new Vector3(_director.AvalancheX - 1.2f, 4f, 0f);
+        wall.localScale = new Vector3(width, height, 1f);
+        wall.position = new Vector3(_director.AvalancheX - width * 0.35f, camY, 0f);
     }
 
     private static void FollowLocalPlayer()
@@ -195,7 +214,9 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
         }
 
         Vector3 target = PlayerController.Local.transform.position;
-        float x = Mathf.Clamp(target.x, 0f, BananaRushConfig.ParkourFinishX - 4f);
+        float minCamX = BananaRushConfig.ParkourStartX + 2f;
+        float maxCamX = BananaRushConfig.ParkourFinishX - 3f;
+        float x = Mathf.Clamp(target.x, minCamX, maxCamX);
         Vector3 next = new Vector3(x, Mathf.Max(3f, target.y + 2f), -10f);
         Camera.main.transform.position = Vector3.Lerp(Camera.main.transform.position, next, 8f * Time.deltaTime);
     }

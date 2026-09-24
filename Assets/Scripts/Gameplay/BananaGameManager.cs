@@ -178,10 +178,22 @@ public class BananaGameManager : NetworkBehaviour
             return;
         }
 
-        SelectedGame = MiniGameNames.Clamp((int)id);
+        MiniGameId next = MiniGameNames.Clamp((int)id);
+        if (SelectedGame == next)
+        {
+            return;
+        }
+
+        SelectedGame = next;
         ApplySelectedGameToSession();
         UnreadyEveryone();
         RPC_ShowFeedback($"Minijuego: {MiniGameNames.Display(SelectedGame)}", 1);
+    }
+
+    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+    public void RPC_RequestSelectGame(int rawId)
+    {
+        SetSelectedGame(MiniGameNames.Clamp(rawId));
     }
 
     public void DeclareWinner(PlayerController winner, string detail)
@@ -367,10 +379,11 @@ public class BananaGameManager : NetworkBehaviour
         var ranked = new List<PlayerController>(GetPlayers());
         ranked.Sort((a, b) =>
         {
-            int eliminated = ((bool)a.IsEliminated).CompareTo((bool)b.IsEliminated);
-            if (eliminated != 0)
+            bool aOut = a.IsEliminated;
+            bool bOut = b.IsEliminated;
+            if (aOut != bOut)
             {
-                return eliminated;
+                return aOut ? 1 : -1;
             }
 
             return b.Score.CompareTo(a.Score);
@@ -436,6 +449,7 @@ public class BananaGameManager : NetworkBehaviour
         if (next == MatchPhase.Lobby)
         {
             RestoreDefaultCamera();
+            StageBackdrop.BeginStaticStage();
             foreach (var player in GetPlayers())
             {
                 player.SetControlMode(PlayerControlMode.Platformer);

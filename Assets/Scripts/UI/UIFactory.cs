@@ -165,7 +165,12 @@ public static class UIFactory
         templateRect.anchorMax = new Vector2(1f, 0f);
         templateRect.pivot = new Vector2(0.5f, 1f);
         templateRect.anchoredPosition = Vector2.zero;
-        templateRect.sizeDelta = new Vector2(0f, 150f);
+        templateRect.sizeDelta = new Vector2(0f, 220f);
+
+        var templateCanvas = template.AddComponent<Canvas>();
+        templateCanvas.overrideSorting = true;
+        templateCanvas.sortingOrder = 400;
+        template.AddComponent<GraphicRaycaster>();
 
         var viewport = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
         viewport.transform.SetParent(template.transform, false);

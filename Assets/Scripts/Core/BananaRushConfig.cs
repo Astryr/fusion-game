@@ -69,8 +69,9 @@ public static class BananaRushConfig
     public const float BananaOvertimeDuration = 30f;
 
     public const float ParkourStartX = -4f;
-    public const float ParkourFinishX = 38f;
-    public const float ParkourMinX = -8f;
-    public const float ParkourMaxX = 42f;
-    public const float ParkourAvalancheSpeed = 3.2f;
+    public const float ParkourFinishX = 78f;
+    public const float ParkourMinX = -10f;
+    public const float ParkourMaxX = 86f;
+    public const float ParkourAvalancheSpeed = 2.85f;
+    public const float ParkourAvalancheWidth = 8f;
 }

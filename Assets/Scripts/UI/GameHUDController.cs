@@ -22,6 +22,9 @@ public class GameHUDController : MonoBehaviour
     private Text _lobbyHint;
     private Text _lobbyPlayers;
     private Dropdown _lobbyGameDropdown;
+    private Button _prevGameButton;
+    private Button _nextGameButton;
+    private GameObject _scoreboardPanel;
     private Button _readyButton;
     private Text _readyButtonLabel;
     private Button _soloButton;
@@ -135,6 +138,7 @@ public class GameHUDController : MonoBehaviour
     {
         var panel = UIFactory.CreatePanel(canvasTransform, "Scoreboard", new Color(0, 0, 0, 0.45f),
             new Vector2(0, 1), new Vector2(0, 1), new Vector2(10, -270), new Vector2(250, -60));
+        _scoreboardPanel = panel.gameObject;
 
         var title = UIFactory.CreateText(panel, "Jugadores", 16, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.35f));
         UIFactory.SetRect(title.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(4, -26), new Vector2(-4, -2));
@@ -153,16 +157,29 @@ public class GameHUDController : MonoBehaviour
         _lobbyTitle = UIFactory.CreateTitleText(_lobbyPanel.transform, "LOBBY", 36, new Color(1f, 0.82f, 0.2f), new Color(0.25f, 0.12f, 0.05f));
         UIFactory.SetRect(_lobbyTitle.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(16, -70), new Vector2(-16, -8));
 
+        var gameLabel = UIFactory.CreateText(_lobbyPanel.transform, "Minijuego (podes cambiarlo ahora)", 14, TextAnchor.MiddleCenter, new Color(0.92f, 0.86f, 0.55f));
+        UIFactory.SetRect(gameLabel.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(20, -96), new Vector2(-20, -72));
+
+        _prevGameButton = UIFactory.CreateButton(_lobbyPanel.transform, "<", new Color(0.28f, 0.32f, 0.4f));
+        UIFactory.SetRect(_prevGameButton.GetComponent<RectTransform>(),
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-230, -138), new Vector2(-190, -100));
+        _prevGameButton.onClick.AddListener(() => CycleLobbyGame(-1));
+
+        _nextGameButton = UIFactory.CreateButton(_lobbyPanel.transform, ">", new Color(0.28f, 0.32f, 0.4f));
+        UIFactory.SetRect(_nextGameButton.GetComponent<RectTransform>(),
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(190, -138), new Vector2(230, -100));
+        _nextGameButton.onClick.AddListener(() => CycleLobbyGame(1));
+
         _lobbyGameDropdown = UIFactory.CreateDropdown(_lobbyPanel.transform, MiniGameNames.DisplayNames);
         UIFactory.SetRect(_lobbyGameDropdown.GetComponent<RectTransform>(),
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-180, -112), new Vector2(180, -76));
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-180, -138), new Vector2(180, -100));
         _lobbyGameDropdown.onValueChanged.AddListener(HandleLobbyGameChanged);
 
         _lobbyHint = UIFactory.CreateText(_lobbyPanel.transform, MiniGameNames.Hint(MiniGameId.BananaRain), 14, TextAnchor.MiddleCenter, new Color(0.8f, 0.82f, 0.86f));
-        UIFactory.SetRect(_lobbyHint.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(20, -168), new Vector2(-20, -118));
+        UIFactory.SetRect(_lobbyHint.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(20, -192), new Vector2(-20, -144));
 
         _lobbyPlayers = UIFactory.CreateText(_lobbyPanel.transform, "Esperando jugadores...", 16, TextAnchor.UpperLeft, Color.white);
-        UIFactory.SetRect(_lobbyPlayers.rectTransform, new Vector2(0, 0), new Vector2(1, 1), new Vector2(24, 70), new Vector2(-24, -176));
+        UIFactory.SetRect(_lobbyPlayers.rectTransform, new Vector2(0, 0), new Vector2(1, 1), new Vector2(24, 70), new Vector2(-24, -200));
 
         _readyButton = UIFactory.CreateButton(_lobbyPanel.transform, "ESTOY LISTO", new Color(0.22f, 0.55f, 0.28f));
         UIFactory.SetRect(_readyButton.GetComponent<RectTransform>(),
@@ -236,10 +253,15 @@ public class GameHUDController : MonoBehaviour
         }
 
         bool isMaster = manager.Object != null && manager.Object.HasStateAuthority;
-        _lobbyGameDropdown.interactable = isMaster;
-        if ((int)manager.SelectedGame != _lobbyGameDropdown.value)
+        _lobbyGameDropdown.interactable = true;
+        _prevGameButton.interactable = true;
+        _nextGameButton.interactable = true;
+        bool dropdownOpen = _lobbyGameDropdown.template != null &&
+                            _lobbyGameDropdown.template.gameObject.activeInHierarchy;
+        if (!dropdownOpen && (int)manager.SelectedGame != _lobbyGameDropdown.value)
         {
             _lobbyGameDropdown.SetValueWithoutNotify((int)manager.SelectedGame);
+            _lobbyGameDropdown.RefreshShownValue();
         }
 
         _lobbyHint.text = MiniGameNames.Hint(manager.SelectedGame);
@@ -400,6 +422,17 @@ public class GameHUDController : MonoBehaviour
             return;
         }
 
+        bool hideForLobby = BananaGameManager.Instance != null && BananaGameManager.Instance.Phase == MatchPhase.Lobby;
+        if (_scoreboardPanel != null)
+        {
+            _scoreboardPanel.SetActive(!hideForLobby);
+        }
+
+        if (hideForLobby)
+        {
+            return;
+        }
+
         var players = FindObjectsByType<PlayerController>(FindObjectsSortMode.None)
             .OrderByDescending(p => p.Score)
             .ToList();
@@ -438,13 +471,32 @@ public class GameHUDController : MonoBehaviour
 
     private void HandleLobbyGameChanged(int index)
     {
+        RequestLobbyGame(MiniGameNames.Clamp(index));
+    }
+
+    private void CycleLobbyGame(int direction)
+    {
         var manager = BananaGameManager.Instance;
-        if (manager == null || !manager.Object.HasStateAuthority)
+        int current = manager != null ? (int)manager.SelectedGame : _lobbyGameDropdown.value;
+        int count = MiniGameNames.DisplayNames.Length;
+        int next = (current + direction) % count;
+        if (next < 0)
+        {
+            next += count;
+        }
+
+        RequestLobbyGame(MiniGameNames.Clamp(next));
+    }
+
+    private static void RequestLobbyGame(MiniGameId id)
+    {
+        var manager = BananaGameManager.Instance;
+        if (manager == null || manager.Phase != MatchPhase.Lobby)
         {
             return;
         }
 
-        manager.SetSelectedGame(MiniGameNames.Clamp(index));
+        manager.RPC_RequestSelectGame((int)id);
     }
 
     private void HandleReadyClicked()

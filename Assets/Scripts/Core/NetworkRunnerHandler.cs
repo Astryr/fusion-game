@@ -6,6 +6,8 @@ using Fusion.Sockets;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
+#pragma warning disable CS0618
+
 /// <summary>
 /// Punto central de conexion a Photon Fusion 2.
 ///
@@ -403,9 +405,7 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         OnConnectionFailedEvent?.Invoke(reason.ToString());
     }
 
-#pragma warning disable CS0618
     public void OnUserSimulationMessage(NetworkRunner runner, SimulationMessagePtr message) { }
-#pragma warning restore CS0618
     public void OnSessionListUpdated(NetworkRunner runner, List<SessionInfo> sessionList)
     {
         _availableSessions.Clear();

@@ -19,14 +19,16 @@ bananas que caen desde arriba antes de que toquen el piso.
   **ESTOY LISTO**. Recien ahi corre la cuenta regresiva.
 - Si estas testeando **sin compañeros**, el host tiene **PROBAR SOLO**:
   con eso alcanza 1 jugador listo para arrancar el minijuego.
-- El host puede cambiar el minijuego desde el lobby (eso cancela los ready).
+- En el lobby se puede cambiar el minijuego con el dropdown o las flechas
+  (eso cancela los ready).
 - Cada mono tiene **color + nombre** arriba de la cabeza. Controles de
   movimiento: **A/D** o flechas, **Espacio** para saltar (o para el golpeo
   de pecho).
 - Minijuegos (GDD, con los sprites que hay):
   - **Lluvia de bananas**: +5 / explosiva **-10**. Gana quien llega a 100.
     A los 2:30 arranca un corte de 30s y gana el mejor puntaje.
-  - **Parkour**: carrera a la meta. Si te come la avalancha, quedas fuera.
+  - **Parkour**: carrera larga a la meta, con fondo en parallax. La
+    avalancha es un muro blanco de pantalla completa; si te come, quedas fuera.
   - **Tronco gigante**: el tronco se achica, te pueden empujar, y caen
     cascaras que aturden 3s.
   - **Golpeo de pecho**: spam de Espacio con ritmo. Si el calor llega a
