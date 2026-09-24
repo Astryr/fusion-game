@@ -33,9 +33,9 @@ bananas que caen desde arriba antes de que toquen el piso.
     cascaras que aturden 3s.
   - **Golpeo de pecho**: spam de Espacio con ritmo. Si el calor llega a
     rojo, perdes.
-  - **Memotest 4x3**: cada jugador tiene su propio tablero (6 pares:
-    banana, banana bomba, MonikoBoca, Cazador, Cazador azul, banana espada).
-    El primero en completar gana.
+  - **Memotest 6x3**: cada jugador tiene su propio tablero (9 pares:
+    banana, banana bomba, MonikoBoca, Cazador, Cazador azul, banana espada
+    y bananas verde/roja/azul). El primero en completar gana.
   - **Rompe el arbol**: QTE de teclas. Las rojas son trampa. Primero a 30.
 - Al terminar se ve el ganador y **Volver al lobby** para otra ronda.
 

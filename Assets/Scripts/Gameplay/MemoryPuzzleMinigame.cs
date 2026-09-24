@@ -2,14 +2,14 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Memotest local 4x3 (6 pares). Cada jugador ve su propio tablero
-/// mezclado. El primero que complete las 6 parejas gana.
+/// Memotest local 6x3 (9 pares). Cada jugador ve su propio tablero
+/// mezclado. El primero que complete las 9 parejas gana.
 /// </summary>
 public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
 {
     public MiniGameId Id => MiniGameId.MemoryPuzzle;
 
-    public const int Columns = 4;
+    public const int Columns = 6;
     public const int Rows = 3;
     public const int CellCount = Columns * Rows;
     public const int PairCount = CellCount / 2;
@@ -23,6 +23,7 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
     private readonly int[] _layout = new int[CellCount];
     private readonly bool[] _locked = new bool[CellCount];
     private Sprite[] _pieceSprites;
+    private Color[] _pieceTints;
     private bool _playing;
     private bool _localFinished;
     private int _flipA = -1;
@@ -121,14 +122,30 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
 
     private void LoadSprites()
     {
+        Sprite banana = SpriteFromPrefab("Banana");
         _pieceSprites = new[]
         {
-            SpriteFromPrefab("Banana"),
+            banana,
             SpriteFromPrefab("BananaExplosiva"),
             Resources.Load<Sprite>("Memotest/MonikoBoca"),
             Resources.Load<Sprite>("Memotest/Cazador"),
             Resources.Load<Sprite>("Memotest/CazadorAzul"),
             Resources.Load<Sprite>("Memotest/BananaEspada"),
+            banana,
+            banana,
+            banana,
+        };
+        _pieceTints = new[]
+        {
+            Color.white,
+            Color.white,
+            Color.white,
+            Color.white,
+            Color.white,
+            Color.white,
+            new Color(0.25f, 0.85f, 0.30f, 1f),
+            new Color(0.95f, 0.20f, 0.18f, 1f),
+            new Color(0.25f, 0.45f, 1f, 1f),
         };
     }
 
@@ -141,13 +158,13 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
 
         _canvas = UIFactory.CreateCanvas("PuzzleCanvas");
         var panel = UIFactory.CreatePanel(_canvas.transform, "PuzzlePanel", new Color(0.08f, 0.09f, 0.12f, 0.82f),
-            new Vector2(0.5f, 0.42f), new Vector2(0.5f, 0.42f), new Vector2(-250, -200), new Vector2(250, 210));
+            new Vector2(0.5f, 0.42f), new Vector2(0.5f, 0.42f), new Vector2(-360, -200), new Vector2(360, 210));
 
         _status = UIFactory.CreateText(panel, "Memotest", 16, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.35f));
         UIFactory.SetRect(_status.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(8, 8), new Vector2(-8, 44));
 
-        const float pad = 18f;
-        float cellW = (500f - pad * 2f) / Columns;
+        const float pad = 16f;
+        float cellW = (720f - pad * 2f) / Columns;
         float cellH = (366f - pad * 2f) / Rows;
         for (int y = 0; y < Rows; y++)
         {
@@ -267,10 +284,20 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
             else
             {
                 _cells[i].sprite = _pieceSprites[value];
-                _cells[i].color = Color.white;
+                _cells[i].color = TintFor(value);
                 _cells[i].preserveAspect = true;
             }
         }
+    }
+
+    private Color TintFor(int value)
+    {
+        if (_pieceTints != null && value >= 0 && value < _pieceTints.Length)
+        {
+            return _pieceTints[value];
+        }
+
+        return Color.white;
     }
 
     private static Color ColorFor(int value)
@@ -282,6 +309,9 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
             2 => new Color(0.85f, 0.55f, 0.25f),
             3 => new Color(0.95f, 0.35f, 0.3f),
             4 => new Color(0.35f, 0.55f, 0.95f),
+            6 => new Color(0.25f, 0.85f, 0.30f),
+            7 => new Color(0.95f, 0.20f, 0.18f),
+            8 => new Color(0.25f, 0.45f, 1f),
             _ => new Color(0.95f, 0.9f, 0.35f),
         };
     }

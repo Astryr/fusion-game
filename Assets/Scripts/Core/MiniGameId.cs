@@ -36,7 +36,7 @@ public static class MiniGameNames
         "Corre a la meta. Si te come la avalancha, quedas fuera.",
         "Quedate en el tronco. Empuja a los demas y cuidado con las cascaras.",
         "Spamea ESPACIO con ritmo. Si te pasas, el pecho se pone rojo y perdes.",
-        "Cada uno tiene su tablero. 6 pares. El primero en completar gana.",
+        "Cada uno tiene su tablero. 9 pares. El primero en completar gana.",
         "Apreta la tecla que aparece. Las rojas son trampa. Primero a 30 gana.",
     };
 
