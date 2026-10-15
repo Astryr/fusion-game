@@ -24,10 +24,14 @@ public static class UIFactory
 
     public static void EnsureEventSystem()
     {
-        if (Object.FindFirstObjectByType<EventSystem>() == null)
+        EventSystem existing = Object.FindFirstObjectByType<EventSystem>();
+        if (existing == null)
         {
-            new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+            existing = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule)).GetComponent<EventSystem>();
         }
+
+        // Con navegacion activa, Espacio/Enter "aprietan" el ultimo boton clickeado (ej. LISTO al saltar).
+        existing.sendNavigationEvents = false;
     }
 
     public static Camera EnsureCamera()
@@ -103,7 +107,7 @@ public static class UIFactory
         return text;
     }
 
-    private static Font GetTitleFont()
+    public static Font GetTitleFont()
     {
         if (_titleFont == null)
         {

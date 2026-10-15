@@ -109,7 +109,7 @@ public class PlayerController : NetworkBehaviour
         {
             PlayerColorIndex = Object.InputAuthority.PlayerId % Palette.Length;
             string nickname = NetworkRunnerHandler.Instance != null ? NetworkRunnerHandler.Instance.LocalNickname : null;
-            Nickname = string.IsNullOrWhiteSpace(nickname) ? $"Jugador {Object.InputAuthority.PlayerId + 1}" : nickname;
+            Nickname = MakeUniqueName(nickname);
             ResetForLobby();
         }
 
@@ -130,11 +130,50 @@ public class PlayerController : NetworkBehaviour
         UpdateFacingAndAnimator();
         if (_nameLabel != null && IsSpawned)
         {
-            _nameLabel.text = DisplayName;
-            _nameLabel.color = IsReady && BananaGameManager.Instance != null && BananaGameManager.Instance.IsInLobby
+            string display = DisplayName;
+            if (_nameLabel.text != display)
+            {
+                _nameLabel.text = display;
+            }
+
+            Color labelColor = IsReady && BananaGameManager.Instance != null && BananaGameManager.Instance.IsInLobby
                 ? new Color(0.45f, 1f, 0.45f)
                 : Color.white;
+            if (_nameLabel.color != labelColor)
+            {
+                _nameLabel.color = labelColor;
+            }
         }
+    }
+
+    private string MakeUniqueName(string requested)
+    {
+        string fallback = $"Jugador {Object.InputAuthority.PlayerId + 1}";
+        string trimmed = string.IsNullOrWhiteSpace(requested) ? string.Empty : requested.Trim();
+        string baseName = trimmed.Length == 0 || trimmed.Equals("Jugador", System.StringComparison.OrdinalIgnoreCase) ? fallback : trimmed;
+
+        string candidate = baseName;
+        int suffix = 2;
+        while (IsNameTaken(candidate))
+        {
+            candidate = $"{baseName} {suffix++}";
+        }
+
+        return candidate;
+    }
+
+    private bool IsNameTaken(string candidate)
+    {
+        foreach (PlayerController other in FindObjectsByType<PlayerController>(FindObjectsSortMode.None))
+        {
+            if (other != null && other != this && other.IsSpawned &&
+                string.Equals(other.Nickname.ToString(), candidate, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public override void FixedUpdateNetwork()
@@ -155,7 +194,11 @@ public class PlayerController : NetworkBehaviour
 
         if (ControlMode == PlayerControlMode.ChestBeat)
         {
-            TickChestBeat(actionPressed || jumpPressed);
+            if (!IsEliminated)
+            {
+                TickChestBeat(actionPressed || jumpPressed);
+            }
+
             NetHorizontal = 0f;
             return;
         }
@@ -236,7 +279,8 @@ public class PlayerController : NetworkBehaviour
         SetWorldBounds(-BananaRushConfig.PlayerClampX, BananaRushConfig.PlayerClampX, BananaRushConfig.GroundTopY, -8f);
         SetPushEnabled(false);
         SetControlMode(PlayerControlMode.Platformer);
-        transform.position = new Vector3(transform.position.x, BananaRushConfig.GroundTopY, 0f);
+        // Si no, tras el parkour todos quedan clampeados en el borde derecho.
+        transform.position = NetworkRunnerHandler.GetSpawnPosition(Object.InputAuthority.PlayerId);
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
@@ -381,6 +425,36 @@ public class PlayerController : NetworkBehaviour
         }
 
         RPC_SetReady(!IsReady);
+    }
+
+    public void SendChat(string text)
+    {
+        if (!IsSpawned || !Object.HasInputAuthority)
+        {
+            return;
+        }
+
+        string clean = GameChat.Sanitize(text);
+        if (clean.Length > 0)
+        {
+            RPC_Chat(clean);
+        }
+    }
+
+    [Rpc(RpcSources.InputAuthority, RpcTargets.All, TickAligned = false)]
+    private void RPC_Chat(string text, RpcInfo info = default)
+    {
+        // Source puede venir vacio; solo se descarta si dice ser otro jugador.
+        if (info.Source != PlayerRef.None && info.Source != Object.InputAuthority)
+        {
+            return;
+        }
+
+        string clean = GameChat.Sanitize(text);
+        if (clean.Length > 0)
+        {
+            GameChat.Receive(Object.InputAuthority.PlayerId, DisplayName, TintColor, clean);
+        }
     }
 
     private void TickPlatformer(float horizontal, bool jumpPressed)

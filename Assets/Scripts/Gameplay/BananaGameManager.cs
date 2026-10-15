@@ -22,7 +22,6 @@ public class BananaGameManager : NetworkBehaviour
     [Networked] public int RoundSeed { get; set; }
     [Networked] public int WinnerScore { get; set; }
     [Networked] public NetworkString<_32> WinnerName { get; set; }
-    [Networked] public NetworkString<_16> WinnerDetail { get; set; }
     [Networked] public NetworkString<_256> ResultsBoard { get; set; }
 
     public bool MatchStarted => Phase == MatchPhase.Playing;
@@ -47,6 +46,7 @@ public class BananaGameManager : NetworkBehaviour
             WinnerScore = 0;
             SelectedGame = ReadSessionMiniGame();
             ApplySelectedGameToSession();
+            SetSessionOpen(true);
         }
 
         _renderedPhase = Phase;
@@ -224,18 +224,22 @@ public class BananaGameManager : NetworkBehaviour
 
     public void DeclareWinner(PlayerController winner, string detail)
     {
-        if (Phase != MatchPhase.Playing || winner == null)
+        if (Phase != MatchPhase.Playing)
         {
             return;
         }
 
+        // Sin ganador (todos eliminados a la vez) la ronda igual tiene que cerrarse.
         if (Object.HasStateAuthority)
         {
             FinishMatch(winner, detail);
             return;
         }
 
-        RPC_DeclareWinner(winner.Object.InputAuthority, detail);
+        if (winner != null)
+        {
+            RPC_DeclareWinner(winner.Object.InputAuthority, detail);
+        }
     }
 
     public void DeclareHighestScoreWinner(string detail)
@@ -315,9 +319,9 @@ public class BananaGameManager : NetworkBehaviour
         OvertimeRemaining = -1f;
         MatchTime = 0f;
         WinnerName = default;
-        WinnerDetail = default;
         WinnerScore = 0;
         ResultsBoard = default;
+        SetSessionOpen(true);
         ResetPlayersForLobby();
     }
 
@@ -352,6 +356,7 @@ public class BananaGameManager : NetworkBehaviour
 
         Phase = MatchPhase.Countdown;
         CountdownRemaining = _countdownDuration;
+        SetSessionOpen(false);
         RPC_ShowFeedback("Todos listos. Arranca el conteo...", 1);
     }
 
@@ -361,6 +366,7 @@ public class BananaGameManager : NetworkBehaviour
         {
             Phase = MatchPhase.Lobby;
             CountdownRemaining = -1f;
+            SetSessionOpen(true);
             RPC_ShowFeedback("Se cancelo el conteo", 2);
             return;
         }
@@ -382,7 +388,6 @@ public class BananaGameManager : NetworkBehaviour
         OvertimeRemaining = -1f;
         RoundSeed = Random.Range(1, int.MaxValue);
         WinnerName = default;
-        WinnerDetail = default;
         WinnerScore = 0;
         ResultsBoard = default;
 
@@ -398,7 +403,6 @@ public class BananaGameManager : NetworkBehaviour
     {
         string name = winner != null ? winner.DisplayName : "Nadie";
         WinnerName = name;
-        WinnerDetail = string.IsNullOrEmpty(detail) ? "Ganador" : detail;
         ResultsBoard = SelectedGame == MiniGameId.Parkour ? BuildParkourBoard(winner) : default;
         int score = winner != null ? winner.Score : 0;
         if (SelectedGame == MiniGameId.MemoryPuzzle)
@@ -407,9 +411,10 @@ public class BananaGameManager : NetworkBehaviour
         }
 
         WinnerScore = score;
-        AwardCupPoints();
+        AwardCupPoints(winner);
         Phase = MatchPhase.Results;
-        RPC_ShowFeedback($"{name} gana", 0);
+        string reason = string.IsNullOrEmpty(detail) ? string.Empty : $" ({detail})";
+        RPC_ShowFeedback($"{name} gana{reason}", 0);
     }
 
     private string BuildParkourBoard(PlayerController winner)
@@ -467,11 +472,17 @@ public class BananaGameManager : NetworkBehaviour
         return lines.Count > 0 ? string.Join("\n", lines) : "Nadie termino.";
     }
 
-    private void AwardCupPoints()
+    private void AwardCupPoints(PlayerController winner)
     {
         var ranked = new List<PlayerController>(GetPlayers());
         ranked.Sort((a, b) =>
         {
+            // El ganador declarado siempre se lleva el primer puesto, aunque haya empate de puntaje.
+            if (a == winner || b == winner)
+            {
+                return a == b ? 0 : a == winner ? -1 : 1;
+            }
+
             bool aOut = a.IsEliminated;
             bool bOut = b.IsEliminated;
             if (aOut != bOut)
@@ -479,7 +490,8 @@ public class BananaGameManager : NetworkBehaviour
                 return aOut ? 1 : -1;
             }
 
-            return b.Score.CompareTo(a.Score);
+            int byScore = b.Score.CompareTo(a.Score);
+            return byScore != 0 ? byScore : a.Object.InputAuthority.PlayerId.CompareTo(b.Object.InputAuthority.PlayerId);
         });
 
         for (int i = 0; i < ranked.Count; i++)
@@ -614,6 +626,27 @@ public class BananaGameManager : NetworkBehaviour
         return NetworkRunnerHandler.Instance != null
             ? NetworkRunnerHandler.Instance.PendingMiniGame
             : MiniGameId.BananaRain;
+    }
+
+    // Cerrada durante la partida para que nadie entre a medio minijuego.
+    private void SetSessionOpen(bool open)
+    {
+        if (Runner == null || Runner.SessionInfo == null || !Runner.SessionInfo.IsValid)
+        {
+            return;
+        }
+
+        try
+        {
+            if (Runner.SessionInfo.IsOpen != open)
+            {
+                Runner.SessionInfo.IsOpen = open;
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning("[BananaGameManager] No se pudo " + (open ? "abrir" : "cerrar") + " la sala: " + ex.Message);
+        }
     }
 
     private void ApplySelectedGameToSession()

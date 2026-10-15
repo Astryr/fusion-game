@@ -156,7 +156,7 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
 
         _canvas = UIFactory.CreateCanvas("PuzzleCanvas");
         var panel = UIFactory.CreatePanel(_canvas.transform, "PuzzlePanel", new Color(0.08f, 0.09f, 0.12f, 0.82f),
-            new Vector2(0.5f, 0.42f), new Vector2(0.5f, 0.42f), new Vector2(-360, -200), new Vector2(360, 210));
+            new Vector2(0.5f, 0.54f), new Vector2(0.5f, 0.54f), new Vector2(-360, -200), new Vector2(360, 210));
 
         _status = UIFactory.CreateText(panel, "Memotest", 16, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.35f));
         UIFactory.SetRect(_status.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(8, 8), new Vector2(-8, 44));

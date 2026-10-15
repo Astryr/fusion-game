@@ -114,8 +114,22 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
         }
         else if (_director.MatchTime >= ShrinkDuration + 15f)
         {
-            _director.DeclareWinner(last, "aguanto mas");
+            _director.DeclareWinner(ClosestToCenter() ?? last, "aguanto mas");
         }
+    }
+
+    private PlayerController ClosestToCenter()
+    {
+        PlayerController best = null;
+        foreach (var player in _director.GetPlayers())
+        {
+            if (!player.IsEliminated && (best == null || Mathf.Abs(player.transform.position.x) < Mathf.Abs(best.transform.position.x)))
+            {
+                best = player;
+            }
+        }
+
+        return best;
     }
 
     public void OnMatchEnded()

@@ -55,6 +55,14 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
     // GetKeyDown dura un frame; OnInput de Fusion puede perderlo.
     private bool _jumpQueued;
     private bool _actionQueued;
+    private string _disconnectMessage;
+
+    public string ConsumeDisconnectMessage()
+    {
+        string message = _disconnectMessage;
+        _disconnectMessage = null;
+        return message;
+    }
 
     private void Awake()
     {
@@ -70,6 +78,13 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
 
     private void Update()
     {
+        if (GameChat.IsTyping)
+        {
+            _jumpQueued = false;
+            _actionQueued = false;
+            return;
+        }
+
         if (Input.GetKeyDown(KeyCode.Space))
         {
             _jumpQueued = true;
@@ -232,7 +247,20 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
             return true;
         }
 
-        Debug.LogError($"[NetworkRunnerHandler] Fallo la conexion: {result.ShutdownReason}");
+        bool expected = result.ShutdownReason == ShutdownReason.GameClosed
+                        || result.ShutdownReason == ShutdownReason.GameIsFull
+                        || result.ShutdownReason == ShutdownReason.GameNotFound
+                        || result.ShutdownReason == ShutdownReason.GameIdAlreadyExists;
+        string failure = $"[NetworkRunnerHandler] Fallo la conexion: {result.ShutdownReason}";
+        if (expected)
+        {
+            Debug.LogWarning(failure);
+        }
+        else
+        {
+            Debug.LogError(failure);
+        }
+
         OnConnectionFailedEvent?.Invoke(HumanizeShutdown(result.ShutdownReason));
         DestroyRunner(Runner);
         Runner = null;
@@ -261,6 +289,12 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         {
             ShutdownReason.GameIsFull => "La sala esta llena (maximo 4).",
             ShutdownReason.GameNotFound => "No se encontro esa sala.",
+            ShutdownReason.GameClosed => "La partida ya empezo. Proba de nuevo cuando termine.",
+            ShutdownReason.GameIdAlreadyExists => "Ya existe una sala con ese nombre.",
+            ShutdownReason.MaxCcuReached => "Photon llego al limite de jugadores simultaneos (CCU).",
+            ShutdownReason.InvalidRegion => "La region de Photon configurada no es valida.",
+            ShutdownReason.PhotonCloudTimeout or ShutdownReason.ConnectionTimeout or ShutdownReason.OperationTimeout
+                => "Se perdio la conexion con Photon.",
             ShutdownReason.DisconnectedByPluginLogic => "Photon corto la conexion.",
             _ => reason.ToString(),
         };
@@ -271,7 +305,7 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         Runner?.Shutdown();
     }
 
-    private static Vector3 GetSpawnPosition(int playerIndex)
+    public static Vector3 GetSpawnPosition(int playerIndex)
     {
         const int slots = 4;
         float spread = BananaRushConfig.PlayerClampX * 0.85f;
@@ -352,14 +386,18 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
 
         var data = new NetworkInputData();
 
+        bool typing = GameChat.IsTyping;
         float horizontal = 0f;
-        if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) horizontal -= 1f;
-        if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) horizontal += 1f;
+        if (!typing)
+        {
+            if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) horizontal -= 1f;
+            if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) horizontal += 1f;
+        }
 
         // Solo Space; el buffer se consume aca.
         var buttons = default(NetworkButtons);
-        buttons.Set(InputButton.Jump, _jumpQueued);
-        buttons.Set(InputButton.Action, _actionQueued);
+        buttons.Set(InputButton.Jump, _jumpQueued && !typing);
+        buttons.Set(InputButton.Action, _actionQueued && !typing);
         _jumpQueued = false;
         _actionQueued = false;
 
@@ -377,9 +415,15 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
             return;
         }
 
+        bool wasConnected = IsConnected;
         IsConnected = false;
         CurrentSessionName = null;
         _spawnedPlayers.Clear();
+        GameChat.Clear();
+        if (wasConnected && shutdownReason != ShutdownReason.Ok)
+        {
+            _disconnectMessage = "Te desconectaste: " + HumanizeShutdown(shutdownReason);
+        }
         if (Runner == runner)
         {
             Runner = null;

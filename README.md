@@ -10,12 +10,20 @@ pantalla de victoria → volver al lobby.
 
 - En el menu cada jugador pone su **nombre**, crea una sala o se une a una
   de la lista, y elige el **minijuego**. Maximo 4 por sala.
-- En el lobby el juego no arranca solo: hacen falta al menos 2 jugadores y
-  que todos apreten **ESTOY LISTO**. Ahi corre una cuenta atras de 5s.
+- El **lobby** muestra una tarjeta por jugador (nombre, mono, puntos de
+  Copa y si esta listo). El juego no arranca solo: hacen falta al menos 2
+  jugadores y que todos apreten **ESTOY LISTO**. Ahi corre una cuenta atras
+  de 5s.
 - El host puede usar **PROBAR SOLO** para testear sin un segundo jugador.
 - En el lobby se puede cambiar el minijuego (eso cancela los ready).
+  Mientras corre la cuenta atras o la partida la sala se cierra: nadie
+  puede entrar a mitad de un minijuego. Se vuelve a abrir en el lobby.
 - Controles: **A/D** o flechas para moverse, **Espacio** para saltar
   (o para el golpeo de pecho).
+- **Chat de texto** en el lobby y en la partida: **ENTER** abre el chat,
+  se escribe y **ENTER** envia (**ESC** cancela). Mientras se escribe el
+  mono no se mueve. Mensajes de hasta 100 caracteres con nombre y color
+  del jugador.
 - Minijuegos:
   - **Lluvia de bananas**: +5 / explosiva -10 / verde rara +20. Gana quien
     llega a 100. A los 2:30 hay un corte de 30s.
@@ -27,7 +35,8 @@ pantalla de victoria → volver al lobby.
     rojo, perdes.
   - **Memotest**: cada jugador tiene su tablero 6x3 (9 pares). 7s para
     mirar. El primero en completar gana.
-  - **Rompe el arbol**: QTE de teclas. Las rojas son trampa. Primero a 30.
+  - **Rompe el arbol**: QTE de teclas. Las rojas son trampa. Primero a 30
+    golpes buenos o, a los 60s, el que mas tenga.
 - Al terminar se ven puestos y puntos de Copa (4-3-2-1). Desde ahi se
   vuelve al lobby para otra ronda.
 
@@ -38,20 +47,27 @@ pantalla de victoria → volver al lobby.
 - Region fija **`sa`** (Sao Paulo) en `PhotonAppSettings`. Todas las PCs
   tienen que usar la misma region o no se ven las salas. Si `sa` no
   responde, cambiar `FixedRegion` a `us` en todas las maquinas.
-- Input Manager clasico y UI de `UnityEngine.UI`.
+- Input Manager clasico y UI de `UnityEngine.UI` armada por codigo
+  (`UIStyle` + `UIFactory`).
 
 ## Que esta hecho
 
 - Crear sala, listar salas abiertas y unirse. Tope de 4. Property de
-  sesion con el minijuego.
+  sesion con el minijuego. La sala se cierra al arrancar la cuenta atras.
 - Ready check por RPC. No arranca hasta que todos estan listos.
 - 6 minijuegos. Director de partida con fases lobby / countdown /
   playing / results.
 - Input de Fusion, State/Input Authority por jugador, bananas y cascaras
   en red.
-- Nombres sobre la cabeza, toasts, popups, pantalla de victoria.
+- Chat de texto por RPC (`PlayerController.RPC_Chat`): el remitente sale
+  del `InputAuthority` del objeto, el texto se sanea al enviar y al recibir.
+- Menu principal con arte (fondo, logo de la Copa Banana, monos y bananas
+  animados) y lobby estilo "tarjetas de jugador".
+- Nombres sobre la cabeza (unicos: si hay repetidos se agrega un numero),
+  toasts, popups, pantalla de victoria.
 - Musica de menu/lobby y de minijuegos.
-- Desconexion a mitad de partida: si queda un jugador, gana.
+- Desconexion a mitad de partida: si queda un jugador, gana. Si te
+  desconectan, el menu te avisa el motivo.
 
 ## Primeros pasos
 
@@ -69,13 +85,13 @@ Assets/
     MainMenu.unity
     Game.unity
   Scripts/
-    Core/         Conexion, input, config, audio
+    Core/         Conexion, input, config, audio, chat (GameChat)
     Player/       Movimiento, ready, nickname, puntaje
     Gameplay/     Director + 6 minijuegos
-    UI/           Menu, HUD, factory
+    UI/           Menu, lobby, chat, HUD, UIStyle/UIFactory
   Sprites/
   Animations/Player/
-  Resources/      Prefabs de red + audio + cartas del memotest
+  Resources/      Prefabs de red + audio + cartas del memotest + arte del menu
   Editor/         Tools > Banana Rush
   Photon/         SDK Fusion 2
 ```

@@ -57,7 +57,7 @@ public class TreeChopMinigame : MonoBehaviour, IMiniGame
             _timeLeft -= deltaTime;
             RefreshHud();
 
-            if (Input.anyKeyDown)
+            if (Input.anyKeyDown && !GameChat.IsTyping)
             {
                 HandleKey();
             }

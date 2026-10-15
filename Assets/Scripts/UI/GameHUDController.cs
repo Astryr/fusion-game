@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Fusion;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -7,25 +8,20 @@ using UnityEngine.UI;
 public class GameHUDController : MonoBehaviour
 {
     private const float ScoreboardRefreshInterval = 0.25f;
+    private const float EndScreenHoldSeconds = 4.5f;
 
     private Text _infoText;
     private Text _toastText;
     private float _toastLife;
+    private bool _toastInLobby;
+    private GameObject _topBar;
     private RectTransform _scoreboardContent;
+    private GameObject _scoreboardPanel;
     private readonly List<Text> _scoreRows = new List<Text>();
 
-    private GameObject _lobbyPanel;
-    private Text _lobbyTitle;
-    private Text _lobbyHint;
-    private Text _lobbyPlayers;
-    private Dropdown _lobbyGameDropdown;
-    private Button _prevGameButton;
-    private Button _nextGameButton;
-    private GameObject _scoreboardPanel;
-    private Button _readyButton;
-    private Text _readyButtonLabel;
-    private Button _soloButton;
-    private Text _soloButtonLabel;
+    private LobbyScreen _lobby;
+    private readonly LobbyData _lobbyData = new LobbyData();
+    private ChatController _chat;
 
     private GameObject _banner;
     private Text _bannerText;
@@ -34,7 +30,6 @@ public class GameHUDController : MonoBehaviour
     private Text _endScreenText;
     private Button _backToLobbyButton;
     private float _endScreenShownAt = -1f;
-    private const float EndScreenHoldSeconds = 4.5f;
 
     private GameObject _chestPanel;
     private Image _heatFill;
@@ -115,125 +110,150 @@ public class GameHUDController : MonoBehaviour
     {
         var canvas = UIFactory.CreateCanvas("GameHUDCanvas");
 
-        var topBar = UIFactory.CreatePanel(canvas.transform, "TopBar", new Color(0, 0, 0, 0.45f),
-            new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, -50), Vector2.zero);
-
-        _infoText = UIFactory.CreateText(topBar, "Conectado", 16, TextAnchor.MiddleLeft, Color.white);
-        UIFactory.SetRect(_infoText.rectTransform, Vector2.zero, Vector2.one, new Vector2(16, 0), new Vector2(-150, 0));
-
-        var leaveButton = UIFactory.CreateButton(topBar, "Salir", new Color(0.8f, 0.25f, 0.25f));
-        UIFactory.SetRect(leaveButton.GetComponent<RectTransform>(),
-            new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-140, -18), new Vector2(-10, 18));
-        leaveButton.onClick.AddListener(HandleLeaveClicked);
-
+        BuildTopBar(canvas.transform);
         BuildScoreboard(canvas.transform);
         BuildLobby(canvas.transform);
         BuildBanner(canvas.transform);
         BuildChest(canvas.transform);
         BuildToast(canvas.transform);
         BuildEndScreen(canvas.transform);
+
+        _chat = gameObject.AddComponent<ChatController>();
+        _chat.Build();
+    }
+
+    private void BuildTopBar(Transform canvasTransform)
+    {
+        Image bar = UIStyle.CreateImage(canvasTransform, "TopBar", new Color(0.02f, 0.07f, 0.05f, 0.82f), 2);
+        bar.sprite = null;
+        bar.type = Image.Type.Simple;
+        bar.raycastTarget = false;
+        _topBar = bar.gameObject;
+        UIFactory.SetRect(bar.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, -50), Vector2.zero);
+
+        Image line = UIStyle.CreateImage(bar.transform, "Line", UIStyle.Banana, 2);
+        line.sprite = null;
+        line.type = Image.Type.Simple;
+        line.raycastTarget = false;
+        UIFactory.SetRect(line.rectTransform, Vector2.zero, new Vector2(1f, 0f), Vector2.zero, new Vector2(0f, 3f));
+
+        _infoText = UIFactory.CreateText(bar.transform, "Conectado", 17, TextAnchor.MiddleLeft, Color.white);
+        _infoText.fontStyle = FontStyle.Bold;
+        _infoText.raycastTarget = false;
+        _infoText.supportRichText = false;
+        UIFactory.SetRect(_infoText.rectTransform, Vector2.zero, Vector2.one, new Vector2(16, 0), new Vector2(-150, 0));
+
+        Button leaveButton = UIStyle.CreateButton(bar.transform, "SALIR", UIStyle.Danger, 22, 10, 4f);
+        UIFactory.SetRect(leaveButton.GetComponent<RectTransform>(),
+            new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-132, -17), new Vector2(-12, 17));
+        leaveButton.onClick.AddListener(HandleLeaveClicked);
     }
 
     private void BuildScoreboard(Transform canvasTransform)
     {
-        var panel = UIFactory.CreatePanel(canvasTransform, "Scoreboard", new Color(0, 0, 0, 0.45f),
-            new Vector2(0, 1), new Vector2(0, 1), new Vector2(10, -270), new Vector2(250, -60));
-        _scoreboardPanel = panel.gameObject;
+        UIStyle.Frame frame = UIStyle.CreateFrame(canvasTransform, "Scoreboard", UIStyle.WithAlpha(UIStyle.Banana, 0.9f),
+            new Color(0.03f, 0.09f, 0.06f, 0.78f), 14, 2f);
+        _scoreboardPanel = frame.Border.gameObject;
+        frame.Border.raycastTarget = false;
+        frame.Fill.raycastTarget = false;
+        UIFactory.SetRect(frame.Border.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(10, -270), new Vector2(262, -62));
 
-        var title = UIFactory.CreateText(panel, "Jugadores", 16, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.35f));
-        UIFactory.SetRect(title.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(4, -26), new Vector2(-4, -2));
+        Text title = UIStyle.CreateHeading(frame.Border.transform, "JUGADORES", 24, UIStyle.Banana, UIStyle.Brown);
+        UIFactory.SetRect(title.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(4, -34), new Vector2(-4, -4));
 
         var contentGO = new GameObject("Rows", typeof(RectTransform));
-        contentGO.transform.SetParent(panel, false);
+        contentGO.transform.SetParent(frame.Border.transform, false);
         _scoreboardContent = contentGO.GetComponent<RectTransform>();
-        UIFactory.SetRect(_scoreboardContent, new Vector2(0, 1), new Vector2(1, 1), new Vector2(4, -200), new Vector2(-4, -28));
+        UIFactory.SetRect(_scoreboardContent, new Vector2(0, 1), new Vector2(1, 1), new Vector2(8, -196), new Vector2(-8, -38));
     }
 
     private void BuildLobby(Transform canvasTransform)
     {
-        _lobbyPanel = UIFactory.CreatePanel(canvasTransform, "LobbyPanel", new Color(0.07f, 0.08f, 0.12f, 0.92f),
-            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-300, -240), new Vector2(300, 200)).gameObject;
-
-        _lobbyTitle = UIFactory.CreateTitleText(_lobbyPanel.transform, "LOBBY", 36, new Color(1f, 0.82f, 0.2f), new Color(0.25f, 0.12f, 0.05f));
-        UIFactory.SetRect(_lobbyTitle.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(16, -70), new Vector2(-16, -8));
-
-        var gameLabel = UIFactory.CreateText(_lobbyPanel.transform, "Minijuego (podes cambiarlo ahora)", 14, TextAnchor.MiddleCenter, new Color(0.92f, 0.86f, 0.55f));
-        UIFactory.SetRect(gameLabel.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(20, -96), new Vector2(-20, -72));
-
-        _prevGameButton = UIFactory.CreateButton(_lobbyPanel.transform, "<", new Color(0.28f, 0.32f, 0.4f));
-        UIFactory.SetRect(_prevGameButton.GetComponent<RectTransform>(),
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-230, -138), new Vector2(-190, -100));
-        _prevGameButton.onClick.AddListener(() => CycleLobbyGame(-1));
-
-        _nextGameButton = UIFactory.CreateButton(_lobbyPanel.transform, ">", new Color(0.28f, 0.32f, 0.4f));
-        UIFactory.SetRect(_nextGameButton.GetComponent<RectTransform>(),
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(190, -138), new Vector2(230, -100));
-        _nextGameButton.onClick.AddListener(() => CycleLobbyGame(1));
-
-        _lobbyGameDropdown = UIFactory.CreateDropdown(_lobbyPanel.transform, MiniGameNames.DisplayNames);
-        UIFactory.SetRect(_lobbyGameDropdown.GetComponent<RectTransform>(),
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-180, -138), new Vector2(180, -100));
-        _lobbyGameDropdown.onValueChanged.AddListener(HandleLobbyGameChanged);
-
-        _lobbyHint = UIFactory.CreateText(_lobbyPanel.transform, MiniGameNames.Hint(MiniGameId.BananaRain), 14, TextAnchor.MiddleCenter, new Color(0.8f, 0.82f, 0.86f));
-        UIFactory.SetRect(_lobbyHint.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(20, -192), new Vector2(-20, -144));
-
-        _lobbyPlayers = UIFactory.CreateText(_lobbyPanel.transform, "Esperando jugadores...", 16, TextAnchor.UpperLeft, Color.white);
-        UIFactory.SetRect(_lobbyPlayers.rectTransform, new Vector2(0, 0), new Vector2(1, 1), new Vector2(24, 70), new Vector2(-24, -200));
-
-        _readyButton = UIFactory.CreateButton(_lobbyPanel.transform, "ESTOY LISTO", new Color(0.22f, 0.55f, 0.28f));
-        UIFactory.SetRect(_readyButton.GetComponent<RectTransform>(),
-            new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(-250, 18), new Vector2(-10, 58));
-        _readyButton.onClick.AddListener(HandleReadyClicked);
-        _readyButtonLabel = _readyButton.GetComponentInChildren<Text>();
-
-        _soloButton = UIFactory.CreateButton(_lobbyPanel.transform, "PROBAR SOLO", new Color(0.45f, 0.32f, 0.18f));
-        UIFactory.SetRect(_soloButton.GetComponent<RectTransform>(),
-            new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(10, 18), new Vector2(250, 58));
-        _soloButton.onClick.AddListener(HandleSoloClicked);
-        _soloButtonLabel = _soloButton.GetComponentInChildren<Text>();
+        _lobby = LobbyScreen.Create(canvasTransform);
+        _lobby.ReadyClicked += HandleReadyClicked;
+        _lobby.LeaveClicked += HandleLeaveClicked;
+        _lobby.SoloClicked += HandleSoloClicked;
+        _lobby.GameChosen += index => RequestLobbyGame(MiniGameNames.Clamp(index));
+        _lobby.GameCycled += CycleLobbyGame;
     }
 
     private void BuildBanner(Transform canvasTransform)
     {
-        _banner = UIFactory.CreatePanel(canvasTransform, "Banner", new Color(0, 0, 0, 0.35f),
-            new Vector2(0.5f, 0.78f), new Vector2(0.5f, 0.78f), new Vector2(-260, -40), new Vector2(260, 40)).gameObject;
-        _bannerText = UIFactory.CreateTitleText(_banner.transform, string.Empty, 40, new Color(1f, 0.86f, 0.3f), new Color(0.2f, 0.1f, 0.04f));
+        Image pill = UIStyle.CreateImage(canvasTransform, "Banner", new Color(0.02f, 0.07f, 0.05f, 0.55f), 28);
+        pill.raycastTarget = false;
+        _banner = pill.gameObject;
+        UIFactory.SetRect(pill.rectTransform, new Vector2(0.5f, 0.78f), new Vector2(0.5f, 0.78f), new Vector2(-230, -54), new Vector2(230, 54));
+        _bannerText = UIStyle.CreateHeading(_banner.transform, string.Empty, 72, UIStyle.Banana, UIStyle.Brown);
+        UIFactory.SetRect(_bannerText.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         _banner.SetActive(false);
     }
 
     private void BuildChest(Transform canvasTransform)
     {
-        _chestPanel = UIFactory.CreatePanel(canvasTransform, "ChestHud", new Color(0, 0, 0, 0.45f),
-            new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(-180, 20), new Vector2(180, 70)).gameObject;
-        _heatLabel = UIFactory.CreateText(_chestPanel.transform, "Calor del pecho", 14, TextAnchor.MiddleCenter, Color.white);
-        UIFactory.SetRect(_heatLabel.rectTransform, new Vector2(0, 0.55f), new Vector2(1, 1), new Vector2(8, 0), new Vector2(-8, -4));
-        var back = UIFactory.CreatePanel(_chestPanel.transform, "HeatBack", new Color(0.2f, 0.1f, 0.1f, 1f),
-            new Vector2(0, 0), new Vector2(1, 0.5f), new Vector2(12, 8), new Vector2(-12, -8));
-        var fill = UIFactory.CreatePanel(back, "HeatFill", new Color(1f, 0.3f, 0.15f, 1f),
-            new Vector2(0, 0), new Vector2(0, 1), Vector2.zero, Vector2.zero);
-        _heatFill = fill.GetComponent<Image>();
+        Image panel = UIStyle.CreateImage(canvasTransform, "ChestHud", new Color(0.02f, 0.07f, 0.05f, 0.7f), 14);
+        panel.raycastTarget = false;
+        _chestPanel = panel.gameObject;
+        UIFactory.SetRect(panel.rectTransform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(-180, 20), new Vector2(180, 74));
+
+        _heatLabel = UIFactory.CreateText(_chestPanel.transform, "Calor del pecho", 15, TextAnchor.MiddleCenter, Color.white);
+        _heatLabel.fontStyle = FontStyle.Bold;
+        UIFactory.SetRect(_heatLabel.rectTransform, new Vector2(0, 0.52f), new Vector2(1, 1), new Vector2(8, 0), new Vector2(-8, -4));
+
+        Image back = UIStyle.CreateImage(_chestPanel.transform, "HeatBack", new Color(0.18f, 0.09f, 0.08f, 1f), 8);
+        UIFactory.SetRect(back.rectTransform, new Vector2(0, 0), new Vector2(1, 0.5f), new Vector2(12, 8), new Vector2(-12, -6));
+
+        Image fill = UIStyle.CreateImage(back.transform, "HeatFill", new Color(1f, 0.3f, 0.15f, 1f), 8);
+        UIFactory.SetRect(fill.rectTransform, new Vector2(0, 0), new Vector2(0, 1), Vector2.zero, Vector2.zero);
+        _heatFill = fill;
         _chestPanel.SetActive(false);
     }
 
     private void BuildToast(Transform canvasTransform)
     {
-        _toastText = UIFactory.CreateText(canvasTransform, string.Empty, 20, TextAnchor.MiddleCenter, new Color(1f, 0.9f, 0.45f));
-        UIFactory.SetRect(_toastText.rectTransform, new Vector2(0.15f, 0.62f), new Vector2(0.85f, 0.72f), Vector2.zero, Vector2.zero);
+        _toastText = UIFactory.CreateText(canvasTransform, string.Empty, 22, TextAnchor.MiddleCenter, new Color(1f, 0.9f, 0.45f));
+        _toastText.fontStyle = FontStyle.Bold;
+        _toastText.raycastTarget = false;
+        _toastText.supportRichText = false;
+        var outline = _toastText.gameObject.AddComponent<Outline>();
+        outline.effectColor = new Color(0.1f, 0.05f, 0.02f, 0.9f);
+        outline.effectDistance = new Vector2(1.5f, -1.5f);
+        PlaceToast(false);
+    }
+
+    private void PlaceToast(bool inLobby)
+    {
+        _toastInLobby = inLobby;
+        Vector2 min = inLobby ? new Vector2(0.37f, 0.19f) : new Vector2(0.15f, 0.62f);
+        Vector2 max = inLobby ? new Vector2(0.98f, 0.255f) : new Vector2(0.85f, 0.72f);
+        UIFactory.SetRect(_toastText.rectTransform, min, max, Vector2.zero, Vector2.zero);
     }
 
     private void BuildEndScreen(Transform canvasTransform)
     {
-        _endScreen = UIFactory.CreatePanel(canvasTransform, "EndScreen", new Color(0, 0, 0, 0.88f),
-            Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
+        Image overlay = UIStyle.CreateImage(canvasTransform, "EndScreen", new Color(0.01f, 0.05f, 0.03f, 0.88f), 2);
+        overlay.sprite = null;
+        overlay.type = Image.Type.Simple;
+        _endScreen = overlay.gameObject;
+        UIFactory.SetRect(overlay.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+        Sprite emblem = Resources.Load<Sprite>("Menu/BananaCupEmblem");
+        if (emblem != null)
+        {
+            Image icon = UIStyle.CreateSprite(_endScreen.transform, "Emblem", emblem, Color.white);
+            UIFactory.SetRect(icon.rectTransform, new Vector2(0.5f, 0.8f), new Vector2(0.5f, 0.8f), new Vector2(-90, -90), new Vector2(90, 90));
+            var bob = icon.gameObject.AddComponent<UiBob>();
+            bob.PositionAmplitude = new Vector2(0f, 8f);
+            bob.RotationAmplitude = 3f;
+        }
 
         _endScreenText = UIFactory.CreateTitleText(_endScreen.transform, string.Empty, 48,
             new Color(1f, 0.82f, 0.20f), new Color(0.35f, 0.17f, 0.05f));
-        UIFactory.SetRect(_endScreenText.rectTransform, new Vector2(0, 0.35f), new Vector2(1, 0.75f), new Vector2(40, 0), new Vector2(-40, 0));
+        _endScreenText.raycastTarget = false;
+        UIFactory.SetRect(_endScreenText.rectTransform, new Vector2(0, 0.3f), new Vector2(1, 0.68f), new Vector2(40, 0), new Vector2(-40, 0));
 
-        _backToLobbyButton = UIFactory.CreateButton(_endScreen.transform, "Volver al lobby", new Color(0.24f, 0.5f, 0.85f));
+        _backToLobbyButton = UIStyle.CreateButton(_endScreen.transform, "VOLVER AL LOBBY", UIStyle.Info, 28, 14, 5f);
         UIFactory.SetRect(_backToLobbyButton.GetComponent<RectTransform>(),
-            new Vector2(0.5f, 0.12f), new Vector2(0.5f, 0.12f), new Vector2(-140, -24), new Vector2(140, 24));
+            new Vector2(0.5f, 0.14f), new Vector2(0.5f, 0.14f), new Vector2(-170, -27), new Vector2(170, 27));
         _backToLobbyButton.onClick.AddListener(() => BananaGameManager.Instance?.RPC_RequestReturnToLobby());
         _endScreen.SetActive(false);
     }
@@ -242,9 +262,15 @@ public class GameHUDController : MonoBehaviour
     {
         var manager = BananaGameManager.Instance;
         bool show = manager != null && manager.Phase == MatchPhase.Lobby;
-        if (_lobbyPanel.activeSelf != show)
+        _lobby.SetVisible(show);
+        if (_topBar.activeSelf == show)
         {
-            _lobbyPanel.SetActive(show);
+            _topBar.SetActive(!show);
+        }
+
+        if (_toastInLobby != show)
+        {
+            PlaceToast(show);
         }
 
         if (!show)
@@ -252,66 +278,71 @@ public class GameHUDController : MonoBehaviour
             return;
         }
 
-        bool isMaster = manager.Object != null && manager.Object.HasStateAuthority;
-        _lobbyGameDropdown.interactable = true;
-        _prevGameButton.interactable = true;
-        _nextGameButton.interactable = true;
-        bool dropdownOpen = _lobbyGameDropdown.template != null &&
-                            _lobbyGameDropdown.template.gameObject.activeInHierarchy;
-        if (!dropdownOpen && (int)manager.SelectedGame != _lobbyGameDropdown.value)
-        {
-            _lobbyGameDropdown.SetValueWithoutNotify((int)manager.SelectedGame);
-            _lobbyGameDropdown.RefreshShownValue();
-        }
-
-        _lobbyHint.text = MiniGameNames.Hint(manager.SelectedGame);
-
-        var players = manager.GetPlayers()
-            .Where(p => p != null && p.IsSpawned)
+        PlayerController[] players = manager.GetPlayers()
             .OrderBy(p => p.Object.InputAuthority.PlayerId)
             .ToArray();
-        var lines = new List<string>();
-        foreach (var player in players)
+
+        PlayerRef hostRef = manager.Object != null ? manager.Object.StateAuthority : PlayerRef.None;
+        PlayerController local = PlayerController.Local;
+        var data = _lobbyData;
+        var handler = NetworkRunnerHandler.Instance;
+
+        data.SessionName = handler != null && !string.IsNullOrEmpty(handler.CurrentSessionName) ? handler.CurrentSessionName : "-";
+        data.ConnectedCount = _playerCount;
+        data.SelectedGame = (int)manager.SelectedGame;
+        data.Hint = MiniGameNames.Hint(manager.SelectedGame);
+        data.IsMaster = manager.Object != null && manager.Object.HasStateAuthority;
+        data.SoloOn = manager.AllowSoloPractice;
+        data.LocalReady = local != null && local.IsReady;
+
+        int readyCount = 0;
+        for (int i = 0; i < data.Slots.Length; i++)
         {
-            string ready = player.IsReady ? "<color=#7CFF7C>LISTO</color>" : "<color=#FFB36B>esperando</color>";
-            lines.Add($"• {player.DisplayName}  {ready}");
+            if (i >= players.Length)
+            {
+                data.Slots[i] = default;
+                continue;
+            }
+
+            PlayerController player = players[i];
+            if (player.IsReady)
+            {
+                readyCount++;
+            }
+
+            data.Slots[i] = new LobbySlot
+            {
+                Occupied = true,
+                Name = player.DisplayName,
+                Tint = player.TintColor,
+                IsHost = hostRef != PlayerRef.None && player.Object.InputAuthority == hostRef,
+                IsLocal = player == local,
+                IsReady = player.IsReady,
+                CupScore = player.CupScore,
+            };
         }
 
-        int readyCount = manager.ReadyCount();
-        lines.Add(string.Empty);
-        lines.Add($"Ready {readyCount}/{players.Length}   |   minimo {manager.MinPlayersToStart}   |   maximo {MiniGameNames.MaxPlayers}");
+        int minimum = manager.MinPlayersToStart;
+        bool everyoneReady = players.Length >= minimum && players.Length >= _playerCount && readyCount == players.Length;
         if (manager.AllowSoloPractice)
         {
-            lines.Add("Modo prueba: con ESTOY LISTO arranca aunque estes solo.");
+            data.StatusMain = "Modo prueba: con ESTOY LISTO arranca aunque estes solo.";
         }
-        else if (players.Length < manager.MinPlayersToStart)
+        else if (players.Length < minimum)
         {
-            lines.Add("Falta gente. Si estas solo, usa PROBAR SOLO.");
+            data.StatusMain = "Falta gente. Si estas solo, usa PROBAR SOLO.";
         }
-        else if (!manager.EveryoneReady())
+        else if (!everyoneReady)
         {
-            lines.Add("Cuando TODOS apreten LISTO, arranca el conteo.");
+            data.StatusMain = "Cuando TODOS apreten LISTO, arranca el conteo.";
+        }
+        else
+        {
+            data.StatusMain = "Todos listos...";
         }
 
-        _lobbyPlayers.supportRichText = true;
-        _lobbyPlayers.text = string.Join("\n", lines);
-
-        if (PlayerController.Local != null && _readyButtonLabel != null)
-        {
-            bool ready = PlayerController.Local.IsReady;
-            _readyButtonLabel.text = ready ? "CANCELAR READY" : "ESTOY LISTO";
-            _readyButton.GetComponent<Image>().color = ready ? new Color(0.55f, 0.28f, 0.2f) : new Color(0.22f, 0.55f, 0.28f);
-        }
-
-        bool showSolo = isMaster;
-        _soloButton.gameObject.SetActive(showSolo);
-        if (showSolo && _soloButtonLabel != null)
-        {
-            _soloButtonLabel.text = manager.AllowSoloPractice ? "SOLO: ON" : "PROBAR SOLO";
-            _soloButton.GetComponent<Image>().color = manager.AllowSoloPractice
-                ? new Color(0.28f, 0.5f, 0.28f)
-                : new Color(0.45f, 0.32f, 0.18f);
-        }
+        data.StatusSub = $"Listos {readyCount}/{players.Length}   ·   minimo {minimum}   ·   maximo {MiniGameNames.MaxPlayers}";
+        _lobby.Refresh(data);
     }
 
     private void UpdateBanner()
@@ -515,6 +546,8 @@ public class GameHUDController : MonoBehaviour
         }
 
         Text row = UIFactory.CreateText(_scoreboardContent, string.Empty, 15, TextAnchor.MiddleLeft, Color.white);
+        row.raycastTarget = false;
+        row.supportRichText = false;
         const float rowHeight = 22f;
         float top = -(index * rowHeight);
         float bottom = -((index + 1) * rowHeight);
@@ -523,15 +556,10 @@ public class GameHUDController : MonoBehaviour
         return row;
     }
 
-    private void HandleLobbyGameChanged(int index)
-    {
-        RequestLobbyGame(MiniGameNames.Clamp(index));
-    }
-
     private void CycleLobbyGame(int direction)
     {
         var manager = BananaGameManager.Instance;
-        int current = manager != null ? (int)manager.SelectedGame : _lobbyGameDropdown.value;
+        int current = manager != null ? (int)manager.SelectedGame : 0;
         int count = MiniGameNames.DisplayNames.Length;
         int next = (current + direction) % count;
         if (next < 0)

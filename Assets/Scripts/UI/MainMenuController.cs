@@ -5,6 +5,9 @@ using UnityEngine.UI;
 
 public class MainMenuController : MonoBehaviour
 {
+    private const float RowHeight = 64f;
+    private const float RowGap = 8f;
+
     private InputField _nicknameInput;
     private InputField _sessionNameInput;
     private Dropdown _miniGameDropdown;
@@ -18,8 +21,12 @@ public class MainMenuController : MonoBehaviour
 
     private void Awake()
     {
-        UIFactory.EnsureCamera();
+        Camera camera = UIFactory.EnsureCamera();
         UIFactory.EnsureEventSystem();
+
+        var ambience = new GameObject("MenuAmbience").AddComponent<MenuAmbience>();
+        ambience.Build(camera);
+
         BuildUI();
     }
 
@@ -28,8 +35,16 @@ public class MainMenuController : MonoBehaviour
         var handler = NetworkRunnerHandler.Instance;
         if (handler != null)
         {
-            _statusText.color = new Color(0.8f, 0.85f, 0.7f);
-            _statusText.text = "Buscando salas...";
+            string lastMessage = handler.ConsumeDisconnectMessage();
+            if (!string.IsNullOrEmpty(lastMessage))
+            {
+                ShowStatus(lastMessage, new Color(1f, 0.62f, 0.5f));
+            }
+            else
+            {
+                ShowStatus("Buscando salas...", new Color(0.85f, 0.92f, 0.75f));
+            }
+
             GameAudio.PlayMenu();
             await handler.StartBrowsingAsync();
         }
@@ -57,65 +72,146 @@ public class MainMenuController : MonoBehaviour
 
     private void BuildUI()
     {
-        var canvas = UIFactory.CreateCanvas("MainMenuCanvas");
+        Canvas canvas = UIFactory.CreateCanvas("MainMenuCanvas");
+        BuildTitle(canvas.transform);
+        BuildCreatePanel(canvas.transform);
+        BuildBrowserPanel(canvas.transform);
 
-        var title = UIFactory.CreateTitleText(canvas.transform, "BANANA RUSH", 64,
-            new Color(1f, 0.82f, 0.20f), new Color(0.35f, 0.17f, 0.05f));
-        UIFactory.SetRect(title.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(20, -120), new Vector2(-20, -16));
+        _statusText = UIFactory.CreateText(canvas.transform, string.Empty, 20, TextAnchor.MiddleCenter, new Color(1f, 0.65f, 0.65f));
+        _statusText.fontStyle = FontStyle.Bold;
+        _statusText.raycastTarget = false;
+        var statusOutline = _statusText.gameObject.AddComponent<Outline>();
+        statusOutline.effectColor = new Color(0.05f, 0.09f, 0.04f, 0.95f);
+        statusOutline.effectDistance = new Vector2(1.5f, -1.5f);
+        UIFactory.SetRect(_statusText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(40f, -616f), new Vector2(-40f, -586f));
 
-        var left = UIFactory.CreatePanel(canvas.transform, "CreatePanel", new Color(0.10f, 0.11f, 0.16f, 0.96f),
-            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-520, -250), new Vector2(-20, 170));
-
-        var leftTitle = UIFactory.CreateText(left, "Crear o unirse", 20, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.4f));
-        UIFactory.SetRect(leftTitle.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(12, -36), new Vector2(-12, -8));
-
-        _nicknameInput = UIFactory.CreateInputField(left, "Tu nombre (ej: Tomi)");
-        _nicknameInput.characterLimit = 14;
-        UIFactory.SetRect(_nicknameInput.GetComponent<RectTransform>(),
-            new Vector2(0, 1), new Vector2(1, 1), new Vector2(24, -84), new Vector2(-24, -48));
-
-        _sessionNameInput = UIFactory.CreateInputField(left, "Nombre de sala (ej: Jungla1)");
-        UIFactory.SetRect(_sessionNameInput.GetComponent<RectTransform>(),
-            new Vector2(0, 1), new Vector2(1, 1), new Vector2(24, -130), new Vector2(-24, -94));
-
-        _miniGameDropdown = UIFactory.CreateDropdown(left, MiniGameNames.DisplayNames);
-        UIFactory.SetRect(_miniGameDropdown.GetComponent<RectTransform>(),
-            new Vector2(0, 1), new Vector2(1, 1), new Vector2(24, -176), new Vector2(-24, -140));
-        _miniGameDropdown.onValueChanged.AddListener(_ => RefreshHint());
-
-        _hintText = UIFactory.CreateText(left, MiniGameNames.Hint(MiniGameId.BananaRain), 13, TextAnchor.UpperLeft, new Color(0.75f, 0.78f, 0.82f));
-        UIFactory.SetRect(_hintText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(24, -250), new Vector2(-24, -182));
-
-        _createButton = UIFactory.CreateButton(left, "Crear sala", new Color(0.24f, 0.55f, 0.28f));
-        UIFactory.SetRect(_createButton.GetComponent<RectTransform>(),
-            new Vector2(0, 0), new Vector2(0.5f, 0), new Vector2(24, 56), new Vector2(-8, 100));
-        _createButton.onClick.AddListener(HandleCreateClicked);
-
-        _joinTypedButton = UIFactory.CreateButton(left, "Unirse a esta", new Color(0.24f, 0.45f, 0.85f));
-        UIFactory.SetRect(_joinTypedButton.GetComponent<RectTransform>(),
-            new Vector2(0.5f, 0), new Vector2(1, 0), new Vector2(8, 56), new Vector2(-24, 100));
-        _joinTypedButton.onClick.AddListener(HandleJoinTypedClicked);
-
-        var right = UIFactory.CreatePanel(canvas.transform, "BrowserPanel", new Color(0.10f, 0.11f, 0.16f, 0.96f),
-            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(20, -250), new Vector2(520, 170));
-
-        var rightTitle = UIFactory.CreateText(right, "Salas disponibles", 20, TextAnchor.MiddleLeft, new Color(1f, 0.85f, 0.4f));
-        UIFactory.SetRect(rightTitle.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(16, -36), new Vector2(-110, -8));
-
-        _refreshButton = UIFactory.CreateButton(right, "Refresh", new Color(0.28f, 0.32f, 0.4f));
-        UIFactory.SetRect(_refreshButton.GetComponent<RectTransform>(),
-            new Vector2(1, 1), new Vector2(1, 1), new Vector2(-100, -36), new Vector2(-16, -8));
-        _refreshButton.onClick.AddListener(HandleRefreshClicked);
-
-        var listHost = UIFactory.CreatePanel(right, "List", new Color(0.06f, 0.07f, 0.1f, 0.65f),
-            new Vector2(0, 0), new Vector2(1, 1), new Vector2(16, 16), new Vector2(-16, -48));
-        _sessionListContent = listHost;
-
-        _statusText = UIFactory.CreateText(canvas.transform, string.Empty, 16, TextAnchor.MiddleCenter, new Color(1f, 0.65f, 0.65f));
-        UIFactory.SetRect(_statusText.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(40, 16), new Vector2(-40, 52));
+        Text credits = UIFactory.CreateText(canvas.transform, "Thiago Lima  ·  Santino Jorge  ·  Guadalupe Muiños  ·  Facundo Batastini", 13,
+            TextAnchor.LowerCenter, new Color(1f, 1f, 1f, 0.85f));
+        credits.raycastTarget = false;
+        var creditsShadow = credits.gameObject.AddComponent<Shadow>();
+        creditsShadow.effectColor = new Color(0f, 0f, 0f, 0.85f);
+        creditsShadow.effectDistance = new Vector2(1f, -1f);
+        UIFactory.SetRect(credits.rectTransform, Vector2.zero, new Vector2(1f, 0f), new Vector2(20f, 6f), new Vector2(-20f, 28f));
 
         RefreshHint();
-        RenderSessionList(new List<SessionInfo>());
+        ShowRooms(new List<RoomRow>());
+    }
+
+    private void BuildTitle(Transform parent)
+    {
+        var anchor = new Vector2(0.5f, 1f);
+
+        Sprite emblem = Resources.Load<Sprite>("Menu/BananaCupEmblem");
+        if (emblem != null)
+        {
+            Image icon = UIStyle.CreateSprite(parent, "Emblem", emblem, Color.white);
+            UIFactory.SetRect(icon.rectTransform, anchor, anchor, new Vector2(-470f, -190f), new Vector2(-290f, -10f));
+            var bob = icon.gameObject.AddComponent<UiBob>();
+            bob.PositionAmplitude = new Vector2(0f, 7f);
+            bob.RotationAmplitude = 3f;
+        }
+
+        Text title = UIStyle.CreateHeading(parent, "BANANA RUSH", 120, UIStyle.Banana, UIStyle.Brown);
+        UIFactory.SetRect(title.rectTransform, anchor, anchor, new Vector2(-270f, -150f), new Vector2(440f, -12f));
+        title.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -2f);
+        var titleShadow = title.gameObject.AddComponent<Shadow>();
+        titleShadow.effectColor = new Color(0f, 0f, 0f, 0.45f);
+        titleShadow.effectDistance = new Vector2(0f, -9f);
+
+        Text subtitle = UIStyle.CreateHeading(parent, "LA COPA BANANA DE LA JUNGLA", 30, Color.white, new Color(0.10f, 0.22f, 0.08f));
+        UIFactory.SetRect(subtitle.rectTransform, anchor, anchor, new Vector2(-270f, -192f), new Vector2(440f, -148f));
+        subtitle.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -2f);
+    }
+
+    private void BuildCreatePanel(Transform parent)
+    {
+        var anchor = new Vector2(0.5f, 1f);
+        UIStyle.Frame frame = UIStyle.CreateFrame(parent, "CreatePanel", UIStyle.Banana, UIStyle.PanelFill, 22, 4f);
+        UIFactory.SetRect(frame.Border.rectTransform, anchor, anchor, new Vector2(-570f, -572f), new Vector2(-120f, -208f));
+        Transform content = frame.Border.transform;
+
+        AddPanelHeader(content, "JUGAR", 0f);
+
+        AddFieldLabel(content, "TU NOMBRE", -64f);
+        _nicknameInput = UIStyle.CreateInputField(content, "ej: Tomi");
+        _nicknameInput.characterLimit = 14;
+        UIFactory.SetRect(_nicknameInput.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(1, 1), new Vector2(22, -122), new Vector2(-22, -84));
+
+        AddFieldLabel(content, "NOMBRE DE LA SALA", -130f);
+        _sessionNameInput = UIStyle.CreateInputField(content, "ej: Jungla1");
+        _sessionNameInput.characterLimit = 20;
+        UIFactory.SetRect(_sessionNameInput.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(1, 1), new Vector2(22, -188), new Vector2(-22, -150));
+
+        AddFieldLabel(content, "MINIJUEGO INICIAL", -196f);
+        _miniGameDropdown = UIStyle.CreateDropdown(content, MiniGameNames.DisplayNames);
+        UIFactory.SetRect(_miniGameDropdown.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(1, 1), new Vector2(22, -254), new Vector2(-22, -216));
+        _miniGameDropdown.onValueChanged.AddListener(_ => RefreshHint());
+
+        _hintText = UIStyle.CreateLabel(content, MiniGameNames.Hint(MiniGameId.BananaRain), 14, UIStyle.Muted, TextAnchor.UpperLeft);
+        UIFactory.SetRect(_hintText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(24, -292), new Vector2(-24, -258));
+
+        _createButton = UIStyle.CreateButton(content, "CREAR SALA", UIStyle.Go, 28, 14, 5f);
+        UIFactory.SetRect(_createButton.GetComponent<RectTransform>(), new Vector2(0, 0), new Vector2(0.5f, 0), new Vector2(22, 18), new Vector2(-6, 66));
+        _createButton.onClick.AddListener(HandleCreateClicked);
+
+        _joinTypedButton = UIStyle.CreateButton(content, "UNIRSE POR NOMBRE", UIStyle.Info, 24, 14, 5f);
+        UIFactory.SetRect(_joinTypedButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0), new Vector2(1, 0), new Vector2(6, 18), new Vector2(-22, 66));
+        _joinTypedButton.onClick.AddListener(HandleJoinTypedClicked);
+    }
+
+    private void BuildBrowserPanel(Transform parent)
+    {
+        var anchor = new Vector2(0.5f, 1f);
+        UIStyle.Frame frame = UIStyle.CreateFrame(parent, "BrowserPanel", UIStyle.Banana, UIStyle.PanelFill, 22, 4f);
+        UIFactory.SetRect(frame.Border.rectTransform, anchor, anchor, new Vector2(-90f, -572f), new Vector2(570f, -208f));
+        Transform content = frame.Border.transform;
+
+        AddPanelHeader(content, "SALAS ABIERTAS", 0f);
+
+        _refreshButton = UIStyle.CreateButton(content, "ACTUALIZAR", UIStyle.Info, 20, 10, 4f);
+        UIFactory.SetRect(_refreshButton.GetComponent<RectTransform>(), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-150, -48), new Vector2(-14, -12));
+        _refreshButton.onClick.AddListener(HandleRefreshClicked);
+
+        Image listBackground = UIStyle.CreateImage(content, "List", new Color(0.02f, 0.06f, 0.04f, 0.75f), 14);
+        UIFactory.SetRect(listBackground.rectTransform, new Vector2(0, 0), new Vector2(1, 1), new Vector2(16, 16), new Vector2(-16, -62));
+
+        var viewport = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D));
+        viewport.transform.SetParent(listBackground.transform, false);
+        UIFactory.SetRect(viewport.GetComponent<RectTransform>(), Vector2.zero, Vector2.one, new Vector2(4, 6), new Vector2(-4, -6));
+
+        var contentGO = new GameObject("Content", typeof(RectTransform));
+        contentGO.transform.SetParent(viewport.transform, false);
+        _sessionListContent = contentGO.GetComponent<RectTransform>();
+        _sessionListContent.anchorMin = new Vector2(0f, 1f);
+        _sessionListContent.anchorMax = new Vector2(1f, 1f);
+        _sessionListContent.pivot = new Vector2(0.5f, 1f);
+        _sessionListContent.anchoredPosition = Vector2.zero;
+        _sessionListContent.sizeDelta = new Vector2(0f, 10f);
+
+        var scroll = listBackground.gameObject.AddComponent<ScrollRect>();
+        scroll.viewport = viewport.GetComponent<RectTransform>();
+        scroll.content = _sessionListContent;
+        scroll.horizontal = false;
+        scroll.vertical = true;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
+        scroll.scrollSensitivity = 36f;
+    }
+
+    private static void AddPanelHeader(Transform content, string title, float topOffset)
+    {
+        Image tab = UIStyle.CreateImage(content, "Header", UIStyle.Banana, 14);
+        tab.raycastTarget = false;
+        UIFactory.SetRect(tab.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(8, -52 + topOffset), new Vector2(-8, -8 + topOffset));
+
+        Text text = UIStyle.CreateHeading(tab.transform, title, 32, UIStyle.Brown, new Color(1f, 0.93f, 0.6f, 0.0f), TextAnchor.MiddleLeft);
+        text.GetComponent<Outline>().enabled = false;
+        UIFactory.SetRect(text.rectTransform, Vector2.zero, Vector2.one, new Vector2(18, 0), new Vector2(-170, 0));
+    }
+
+    private static void AddFieldLabel(Transform content, string label, float top)
+    {
+        Text text = UIStyle.CreateLabel(content, label, 13, UIStyle.Muted, TextAnchor.LowerLeft, true);
+        UIFactory.SetRect(text.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(24, top - 20f), new Vector2(-24, top));
     }
 
     private void RefreshHint()
@@ -123,12 +219,23 @@ public class MainMenuController : MonoBehaviour
         _hintText.text = MiniGameNames.Hint(MiniGameNames.Clamp(_miniGameDropdown.value));
     }
 
+    private void ShowStatus(string message, Color color)
+    {
+        if (_statusText == null)
+        {
+            return;
+        }
+
+        _statusText.color = color;
+        _statusText.text = message;
+    }
+
     private async void HandleCreateClicked()
     {
         var handler = NetworkRunnerHandler.Instance;
         if (handler == null)
         {
-            _statusText.text = "Falta el NetworkRunnerHandler en la escena.";
+            ShowStatus("Falta el NetworkRunnerHandler en la escena.", new Color(1f, 0.5f, 0.5f));
             return;
         }
 
@@ -155,8 +262,7 @@ public class MainMenuController : MonoBehaviour
 
         if (string.IsNullOrWhiteSpace(_sessionNameInput.text))
         {
-            _statusText.color = new Color(1f, 0.55f, 0.5f);
-            _statusText.text = "Escribi el nombre de la sala o elegila de la lista.";
+            ShowStatus("Escribi el nombre de la sala o elegila de la lista.", new Color(1f, 0.55f, 0.5f));
             return;
         }
 
@@ -177,8 +283,7 @@ public class MainMenuController : MonoBehaviour
             return;
         }
 
-        _statusText.color = new Color(0.8f, 0.85f, 0.7f);
-        _statusText.text = "Actualizando salas...";
+        ShowStatus("Actualizando salas...", new Color(0.85f, 0.92f, 0.75f));
         await handler.StopBrowsingAsync();
         await handler.StartBrowsingAsync();
     }
@@ -206,24 +311,32 @@ public class MainMenuController : MonoBehaviour
         RenderSessionList(sessions);
         if (_statusText != null && (_statusText.text.StartsWith("Buscando") || _statusText.text.StartsWith("Actualizando")))
         {
-            _statusText.color = new Color(0.75f, 0.8f, 0.75f);
-            _statusText.text = sessions.Count == 0 ? "No hay salas abiertas. Crea una." : $"{sessions.Count} sala(s) encontrada(s).";
+            ShowStatus(sessions.Count == 0 ? "No hay salas abiertas. Crea una." : $"{sessions.Count} sala(s) encontrada(s).",
+                new Color(0.85f, 0.95f, 0.8f));
+        }
+    }
+
+    public readonly struct RoomRow
+    {
+        public readonly string Name;
+        public readonly int Players;
+        public readonly int MaxPlayers;
+        public readonly bool Open;
+        public readonly MiniGameId Game;
+
+        public RoomRow(string name, int players, int maxPlayers, bool open, MiniGameId game)
+        {
+            Name = name;
+            Players = players;
+            MaxPlayers = maxPlayers;
+            Open = open;
+            Game = game;
         }
     }
 
     private void RenderSessionList(List<SessionInfo> sessions)
     {
-        foreach (var row in _sessionRows)
-        {
-            if (row != null)
-            {
-                Destroy(row);
-            }
-        }
-
-        _sessionRows.Clear();
-
-        int visible = 0;
+        var rooms = new List<RoomRow>();
         for (int i = 0; i < sessions.Count; i++)
         {
             SessionInfo info = sessions[i];
@@ -238,26 +351,76 @@ public class MainMenuController : MonoBehaviour
                 game = MiniGameNames.Clamp((int)value);
             }
 
-            string label = $"{info.Name}   {info.PlayerCount}/{info.MaxPlayers}   {MiniGameNames.Display(game)}";
-            var button = UIFactory.CreateButton(_sessionListContent, label, new Color(0.18f, 0.22f, 0.3f));
-            float top = -8f - visible * 46f;
-            UIFactory.SetRect(button.GetComponent<RectTransform>(),
-                new Vector2(0, 1), new Vector2(1, 1), new Vector2(8, top - 38f), new Vector2(-8, top));
-
-            string sessionName = info.Name;
-            bool canJoin = info.IsOpen && info.PlayerCount < info.MaxPlayers;
-            button.interactable = canJoin;
-            button.onClick.AddListener(() => HandleJoinSession(sessionName));
-            _sessionRows.Add(button.gameObject);
-            visible++;
+            rooms.Add(new RoomRow(info.Name, info.PlayerCount, info.MaxPlayers, info.IsOpen, game));
         }
 
-        if (visible == 0)
+        ShowRooms(rooms);
+    }
+
+    public void ShowRooms(List<RoomRow> rooms)
+    {
+        foreach (var row in _sessionRows)
         {
-            var empty = UIFactory.CreateText(_sessionListContent, "No hay partidas en este momento.", 15, TextAnchor.MiddleCenter, new Color(0.7f, 0.72f, 0.75f));
-            UIFactory.SetRect(empty.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(10, -80), new Vector2(-10, -20));
-            _sessionRows.Add(empty.gameObject);
+            if (row != null)
+            {
+                Destroy(row);
+            }
         }
+
+        _sessionRows.Clear();
+
+        for (int i = 0; i < rooms.Count; i++)
+        {
+            _sessionRows.Add(CreateSessionRow(rooms[i], i));
+        }
+
+        int slots = rooms.Count;
+        if (rooms.Count == 0)
+        {
+            Text empty = UIStyle.CreateLabel(_sessionListContent, "No hay partidas en este momento.\nCrea una sala y pasale el nombre a tus amigos.", 17,
+                UIStyle.Muted, TextAnchor.MiddleCenter, true);
+            UIFactory.SetRect(empty.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(16, -140), new Vector2(-16, -40));
+            _sessionRows.Add(empty.gameObject);
+            slots = 2;
+        }
+
+        _sessionListContent.sizeDelta = new Vector2(0f, slots * (RowHeight + RowGap) + RowGap);
+    }
+
+    private GameObject CreateSessionRow(RoomRow room, int index)
+    {
+        bool full = room.Players >= room.MaxPlayers;
+        bool canJoin = room.Open && !full;
+        string caption = !room.Open ? "EN PARTIDA" : full ? "LLENA" : "UNIRSE";
+        Color color = canJoin ? new Color(0.16f, 0.36f, 0.22f, 1f) : new Color(0.20f, 0.24f, 0.22f, 1f);
+
+        Button button = UIStyle.CreateButton(_sessionListContent, room.Name, color, 26, 12, 4f);
+        float top = -RowGap - index * (RowHeight + RowGap);
+        UIFactory.SetRect(button.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(1, 1),
+            new Vector2(6, top - RowHeight), new Vector2(-6, top));
+        button.interactable = canJoin;
+
+        string sessionName = room.Name;
+        button.onClick.AddListener(() => HandleJoinSession(sessionName));
+
+        Text nameText = button.GetComponentInChildren<Text>();
+        nameText.supportRichText = false;
+        nameText.alignment = TextAnchor.UpperLeft;
+        nameText.resizeTextMaxSize = 28;
+        UIFactory.SetRect(nameText.rectTransform, Vector2.zero, Vector2.one, new Vector2(16, 6), new Vector2(-190, -6));
+
+        Transform face = button.targetGraphic.transform;
+        Text gameText = UIStyle.CreateLabel(face, MiniGameNames.Display(room.Game), 15, UIStyle.Muted, TextAnchor.LowerLeft, true);
+        UIFactory.SetRect(gameText.rectTransform, Vector2.zero, Vector2.one, new Vector2(16, 6), new Vector2(-190, -6));
+        gameText.verticalOverflow = VerticalWrapMode.Truncate;
+
+        Text count = UIStyle.CreateHeading(face, $"{room.Players}/{room.MaxPlayers}", 32, canJoin ? UIStyle.Banana : UIStyle.Muted, UIStyle.Brown);
+        UIFactory.SetRect(count.rectTransform, new Vector2(1, 0), new Vector2(1, 1), new Vector2(-176, 22), new Vector2(-12, -2));
+
+        Text state = UIStyle.CreateLabel(face, caption, 14, canJoin ? new Color(0.7f, 1f, 0.7f) : UIStyle.Muted, TextAnchor.MiddleCenter, true);
+        UIFactory.SetRect(state.rectTransform, new Vector2(1, 0), new Vector2(1, 1), new Vector2(-176, 2), new Vector2(-12, -36));
+
+        return button.gameObject;
     }
 
     private void SetBusy(bool busy, string message)
@@ -267,8 +430,7 @@ public class MainMenuController : MonoBehaviour
         _refreshButton.interactable = !busy;
         if (!string.IsNullOrEmpty(message))
         {
-            _statusText.color = new Color(0.8f, 0.85f, 0.9f);
-            _statusText.text = message;
+            ShowStatus(message, new Color(0.85f, 0.92f, 1f));
         }
     }
 
@@ -279,8 +441,7 @@ public class MainMenuController : MonoBehaviour
             return;
         }
 
-        _statusText.color = new Color(1f, 0.5f, 0.5f);
-        _statusText.text = $"No se pudo conectar: {reason}";
+        ShowStatus($"No se pudo conectar: {reason}", new Color(1f, 0.55f, 0.5f));
         SetBusy(false, null);
     }
 }

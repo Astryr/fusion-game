@@ -603,7 +603,11 @@ public static class BananaRushSetupTool
         var go = new GameObject("BananaGameManager");
         try
         {
-            go.AddComponent<NetworkObject>();
+            var networkObject = go.AddComponent<NetworkObject>();
+            // MasterClientObject: si se va el master, el nuevo master hereda el director y lo simula.
+            var serialized = new SerializedObject(networkObject);
+            serialized.FindProperty("Flags").intValue = (int)(NetworkObjectFlags.V2 | NetworkObjectFlags.MasterClientObject);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
             go.AddComponent<BananaGameManager>();
 
             PrefabUtility.SaveAsPrefabAsset(go, path);
