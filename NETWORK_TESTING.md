@@ -28,8 +28,8 @@ El asset ya contiene los valores adversos, pero `Enabled` esta desactivado por d
 
 | Perfil | RTT min/prom/max y variacion | Observaciones de juego | Problemas reproducidos |
 |---|---|---|---|
-| Normal | Pendiente | Pendiente de ejecutar con dos clientes | Sin datos de ejecucion |
-| Adverso | Pendiente | Pendiente de ejecutar con dos clientes | Sin datos de ejecucion |
+| Normal | No medida | Prueba no realizada; requiere dos clientes | Sin observaciones de ejecucion |
+| Adverso | No medida | Prueba no realizada; requiere dos clientes | Sin observaciones de ejecucion |
 
 Observacion de configuracion: Network Conditions estaba desactivado en el asset al iniciar este registro. No se completaron pruebas en vivo porque este entorno no tiene dos clientes de Fusion conectados; no se atribuyen valores de RTT ni fallos no medidos.
 
@@ -56,3 +56,131 @@ No se aplica lag compensation a este juego. No hay disparos hitscan ni ataques d
 **Interest Management / AoI:** no se activa. La sala admite como maximo 4 jugadores y una unica arena; todos necesitan observar a los demas, las bananas y los peligros, incluso en Parkour para determinar posiciones y ganador. La poblacion y el numero de objetos no justifican particionar la distribucion espacial en este juego.
 
 **Limite de autoridad:** en Fusion Shared Mode cada jugador conserva State Authority de su propio Player. Las comprobaciones impiden que otros peers escriban ese objeto y limitan acciones recibidas; no pretenden demostrar que el jugador propietario no manipula su propia ejecucion. No se agrega anticheat externo.
+
+## Optimizaciones con evidencia
+
+Los fragmentos siguientes corresponden al codigo actual. Se incluyen para explicar las decisiones y facilitar la revision; no son resultados de pruebas ejecutadas.
+
+### 1. Altura de roca reconstruida
+
+`LogRockY` ya no es un campo de red que cambia todos los ticks. Al aparecer una roca, la autoridad publica su X, hora de inicio y velocidad. Cada peer reconstruye Y con el reloj de partida sincronizado:
+
+```csharp
+private float RockYAt(float matchTime)
+{
+	float elapsed = Mathf.Max(0f, matchTime - _director.LogRockStartTime);
+	return RockSpawnY - _director.LogRockSpeed * elapsed;
+}
+```
+
+La posicion se inicializa por evento, no mediante una escritura de float por tick durante toda la caida. `LogHoleMask` tambien se modifica solamente al impacto. El objetivo de la prueba es comprobar que todos ven una trayectoria equivalente y que el agujero aparece una sola vez.
+
+### 2. Feedback global sin spam por banana
+
+El puntaje se actualiza en el estado del jugador y el popup de puntos es local. Por eso recoger una banana no necesita ademas mandar un toast global por cada colision. Los toasts globales restantes se limitan a eventos de ronda, resultados y avisos puntuales:
+
+```csharp
+[Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+public void RPC_ShowFeedback(NetworkString<_64> message, int tone)
+{
+	FeedbackRpcCount++;
+	// Mostrar el toast local en cada peer.
+}
+```
+
+`FeedbackRpcCount` es un contador de ejecuciones de este RPC en la instancia local. No cuenta todos los RPC, objetos, bytes ni paquetes. La prueba compara el valor antes y despues de recoger varias bananas: recogerlas no deberia incrementarlo; un evento global, como comenzar la ronda, si.
+
+### 3. Reclamo unico del recurso compartido
+
+La banana valida fase, jugador y distancia en su State Authority. Al aceptar el primer reclamo, marca `Consumed` antes de enviar el efecto y despawnear el objeto:
+
+```csharp
+PlayerRef bananaAuthority = Object.StateAuthority;
+int points = NetPointValue != 0 ? NetPointValue : _pointValue;
+Consumed = true;
+player.ReceiveBananaHit(points, bananaAuthority);
+Runner.Despawn(Object);
+```
+
+El mismo camino aplica stun para las cascaras. Solicitudes repetidas encuentran `Consumed == true` y no vuelven a aplicar el efecto. El resultado esperado ante dos reclamos concurrentes es una sola banana consumida y una sola recompensa.
+
+### 4. Validacion de score por fuente y minijuego
+
+La RPC no acepta cualquier entero enviado por cualquier peer. En fase de juego, el origen debe ser el Input Authority correspondiente, salvo el score de Parkour que escribe el manager State Authority:
+
+```csharp
+else if (info.Source != Object.InputAuthority || !IsValidPlayerScoreChange(manager, score))
+{
+	return;
+}
+```
+
+Los deltas del jugador se limitan a un punto para Memotest y Rompe el Arbol; el score de Parkour se limita al intervalo de puestos. La prueba intenta un score negativo, un salto de muchos puntos, un score en otra fase y una fuente que no sea el owner. Ninguno debe cambiar `Score`.
+
+### 5. Victoria verificada por el manager
+
+El manager comprueba identidad del emisor, que el jugador exista y siga vivo, y el umbral correspondiente al minijuego:
+
+```csharp
+if (Phase != MatchPhase.Playing || info.Source != player)
+	return;
+
+if (winner == null || winner.IsEliminated || !IsValidWinnerClaim(winner))
+	return;
+```
+
+Umbrales comprobados: 100 puntos en Lluvia de bananas, 9 pares en Memotest, 30 golpes en Rompe el Arbol y 50 puntos en Golpeo de pecho. En Parkour y Tronco gigante el resultado se decide desde la autoridad de la partida. La prueba envia reclamos prematuros y de jugadores eliminados: la fase debe seguir en `Playing`.
+
+### 6. Input separado de RPC
+
+El input de movimiento es pequeno y se entrega por el canal de input de Fusion:
+
+```csharp
+public struct NetworkInputData : INetworkInput
+{
+	public float Horizontal;
+	public NetworkButtons Buttons;
+}
+```
+
+El movimiento no genera un RPC manual por tecla o frame. Fusion replica la transformacion del prefab Player con `NetworkTransform`; los estados de score, ready y eliminacion se mantienen en el objeto Player. La prueba busca movimiento remoto continuo sin una RPC por cada pulsacion.
+
+### 7. Decoracion local, no NetworkObjects
+
+Los cocos de la avalancha de Parkour son decoracion local y se animan desde `AvalancheX`; no se crean 144 NetworkObjects ni se transmiten giros por tick. La autoridad sincroniza la posicion de la avalancha que se usa para la eliminacion. La prueba debe confirmar que los cocos se ven animados en ambos clientes, que las eliminaciones siguen coincidiendo con `AvalancheX` y que no aparecen cocos en el inventario de NetworkObjects.
+
+## Casos de prueba propuestos
+
+No se realizaron los casos de esta tabla: requieren una sesion con dos clientes conectados. Los resultados indicados son esperados, no observaciones medidas.
+
+| ID | Caso | Pasos | Resultado esperado |
+|---|---|---|---|
+| N-01 | Conexion base | Abrir dos builds Windows, crear y buscar la misma sala, unirse y esperar a ambos jugadores. | Ambos ven el mismo lobby; sin errores ni desconexion. |
+| N-02 | Input base | Moverse, saltar y cambiar de direccion desde ambos clientes. | Cada cliente controla su player; el otro ve movimiento interpolado, sin RPC manual por tecla. |
+| N-03 | RTT normal | Network Conditions desactivado; jugar 60 s con overlay visible. | RTT registra muestras; anotar min/prom/max y variacion; acciones y posiciones convergen. |
+| N-04 | RTT adverso | Activar perfil Adverso y reiniciar ambos runners; repetir N-03. | RTT/variacion reflejan la condicion impuesta; el resultado final sigue siendo unico y consistente. |
+| N-05 | Perdida de paquetes | Con el perfil Adverso, jugar una ronda completa y observar inputs, pickups y fase final. | Registrar pausas o correcciones; no deben duplicarse recompensas ni declararse dos ganadores. |
+| O-01 | Altura reconstruida | En Tronco gigante, seguir una roca desde el spawn hasta el impacto en ambos clientes. | Las rocas se mueven hacia abajo; impacto y agujero coinciden aunque Y no sea un campo de red por tick. |
+| O-02 | Feedback | Anotar el contador; recoger 5 bananas y luego provocar un aviso global de ronda. | Recoger bananas no suma RPC de feedback; el aviso global suma una ejecucion local por peer. |
+| C-01 | Pickup simultaneo | Hacer que dos jugadores toquen la misma banana en el mismo intervalo de simulacion. | Solo un reclamo valido consume la banana; una sola recompensa o stun. |
+| C-02 | Pickup fuera de rango | Enviar una solicitud cuando el player este a mas de 1.25 unidades de la banana. | La autoridad rechaza el reclamo; no cambia score/stun y la banana sigue activa. |
+| A-01 | Score adulterado | Probar en una build de test score negativo, incremento mayor al permitido y score en lobby. | El estado de `Score` queda igual; no se declara ganador. |
+| A-02 | Fuente incorrecta | Un peer solicita modificar el Player de otro peer. | La autoridad rechaza el RPC; el objeto del otro jugador no cambia. |
+| A-03 | Victoria prematura | Reclamar ganador sin alcanzar el umbral o luego de ser eliminado. | `Phase` permanece en `Playing`; no se abre Results ni se premian puntos de Copa. |
+| A-04 | Seleccion en lobby | Un jugador conectado solicita cambiar minijuego en Lobby; repetir desde una fuente no conectada/fase Playing. | La solicitud valida se acepta solo en Lobby; fuentes ajenas o fase incorrecta no cambian `SelectedGame`. |
+| A-05 | Feedback falsificado | Intentar invocar `RPC_ShowFeedback` desde una fuente que no sea State Authority. | Fusion rechaza la fuente o no se muestra el toast; el contador no aumenta por el intento invalido. |
+| A-06 | Desconexion | Desconectar un cliente durante lobby y durante partida. | La lista se actualiza; se conserva el flujo existente de reabrir lobby o terminar si queda un jugador. |
+| V-01 | Cocos locales | Comparar la avalancha en los dos clientes durante Parkour. | La decoracion cae localmente; el valor autoritativo de `AvalancheX` determina eliminacion y ganador. |
+| V-02 | AoI | Revisar objetos visibles con el maximo actual de 4 jugadores y una arena compartida. | Todos necesitan los mismos players y hazards; no se habilita AoI porque no reduce una carga relevante. |
+
+## Plantilla de resultados
+
+Completar con mediciones de una ejecucion real:
+
+| Caso | Build/region | Perfil de red | RTT min/prom/max | Feedback RPC | Resultado funcional | Incidente |
+|---|---|---|---|---:|---|---|
+| N-03 normal | No realizada | Normal | No medida | No medido | No registrado | No registrado |
+| N-04 adverso | No realizada | Adverso | No medida | No medido | No registrado | No registrado |
+| C-01 simultaneo | No realizada | Normal/adverso | No medida | No medido | No registrado | No registrado |
+
+Estas pruebas no se hicieron en esta sesion: no hay resultados multicliente registrados. Completar la tabla con mediciones reales antes de afirmar que se verificaron latencia, perdida o concurrencia.
