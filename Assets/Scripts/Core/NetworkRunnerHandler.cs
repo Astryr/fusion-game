@@ -228,6 +228,9 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         }
 
         _gameManagerSpawnRequested = false;
+    #if UNITY_EDITOR || DEVELOPMENT_BUILD
+        ResetNetworkDiagnostics();
+    #endif
 
         Runner = gameObject.AddComponent<NetworkRunner>();
         Runner.ProvideInput = true;
@@ -287,6 +290,16 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
     }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
+    private void ResetNetworkDiagnostics()
+    {
+        Array.Clear(_rttWindow, 0, _rttWindow.Length);
+        _rttWindowCount = 0;
+        _rttWindowIndex = 0;
+        _rttSampleTimer = 0f;
+        _previousRttMs = -1f;
+        _rttJitterMs = 0f;
+    }
+
     private void UpdateNetworkDiagnostics()
     {
         if (Runner == null || !Runner.IsRunning)

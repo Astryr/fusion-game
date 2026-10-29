@@ -2,7 +2,7 @@
 
 ## Instrumentacion
 
-En el Editor y en Development Builds, el juego muestra un overlay de red. **F3** lo oculta o muestra. El overlay toma una muestra de `NetworkRunner.GetPlayerRtt(PlayerRef.None)` cada 0.5 segundos y presenta RTT minimo, promedio y maximo en una ventana movil de hasta 30 segundos, mas una variacion suavizada del RTT y el total local acumulado de RPC de feedback recibidos durante la conexion.
+En el Editor y en Development Builds, el juego muestra un overlay de red. **F3** lo oculta o muestra. El overlay toma una muestra de `NetworkRunner.GetPlayerRtt(PlayerRef.None)` cada 0.5 segundos y presenta RTT minimo, promedio y maximo en una ventana movil de hasta 30 segundos, mas una variacion suavizada del RTT y el total local acumulado de RPC de feedback recibidos durante la conexion. La ventana RTT se reinicia al reconectar.
 
 La variacion mostrada no es jitter de llegada de paquetes medido en el transporte: es una estimacion a partir de diferencias entre muestras de RTT. La perdida se inyecta con Network Conditions; el porcentaje configurado es la referencia conocida. Observar tambien pausas, acciones repetidas/perdidas, resultados inconsistentes y desconexiones durante cada perfil.
 
@@ -50,6 +50,8 @@ No se aplica lag compensation a este juego. No hay disparos hitscan ni ataques d
 | Banana individual | NetworkObject mientras cae; el manager la crea y su State Authority la consume | Es necesaria por movimiento y colision independientes. La recoleccion verifica fase, Input Authority reclamante y distancia <= 1.25 unidades. |
 
 **Optimizacion concreta:** antes, `LogRockY` era una propiedad de red que cambiaba en cada tick mientras caia una roca. Se sustituyo por `LogRockStartTime` y `LogRockSpeed`, escritos una vez por roca; como `MatchTime` ya es el reloj sincronizado, cada cliente reconstruye Y. Se elimina una actualizacion de float por tick durante cada caida. La instrumentacion tambien cuenta RPC de feedback para observar su frecuencia; el toast por banana era un mensaje global redundante con el estado de puntaje.
+
+**Acceso simultaneo a una banana:** el primer reclamo que llega al State Authority de esa banana se valida por fuente, fase y distancia. La autoridad marca `Consumed` antes de enviar el efecto al jugador; las solicitudes posteriores se rechazan, por lo que un objeto compartido no puede dar dos recompensas.
 
 **Interest Management / AoI:** no se activa. La sala admite como maximo 4 jugadores y una unica arena; todos necesitan observar a los demas, las bananas y los peligros, incluso en Parkour para determinar posiciones y ganador. La poblacion y el numero de objetos no justifican particionar la distribucion espacial en este juego.
 

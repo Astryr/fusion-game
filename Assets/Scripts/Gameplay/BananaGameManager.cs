@@ -227,7 +227,17 @@ public class BananaGameManager : NetworkBehaviour
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
     public void RPC_RequestSelectGame(int rawId, RpcInfo info = default)
     {
-        if (info.Source != Object.StateAuthority)
+        bool isConnectedPlayer = false;
+        foreach (var player in GetPlayers())
+        {
+            if (player.Object.InputAuthority == info.Source)
+            {
+                isConnectedPlayer = true;
+                break;
+            }
+        }
+
+        if (!isConnectedPlayer)
         {
             return;
         }

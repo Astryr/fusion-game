@@ -387,30 +387,27 @@ public class PlayerController : NetworkBehaviour
         }
     }
 
-    public void ApplyStun(float seconds)
+    public void ApplyStun(float seconds, PlayerRef effectAuthority)
     {
         seconds = Mathf.Clamp(seconds, 0f, 5f);
-        if (seconds <= 0f)
+        if (seconds <= 0f || IsEliminated || !IsValidBananaEffectAuthority(effectAuthority))
         {
             return;
         }
 
         if (!Object.HasStateAuthority)
         {
-            RPC_ApplyStun(seconds);
+            RPC_ApplyStun(seconds, effectAuthority);
             return;
         }
 
-        IsStunned = true;
-        StunUntil = Runner.SimulationTime + seconds;
-        GameFeedback.WorldPopup(transform.position + Vector3.up, "STUN", new Color(1f, 0.85f, 0.3f));
+        ApplyStunOnAuthority(seconds);
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-    public void RPC_ApplyStun(float seconds, RpcInfo info = default)
+    public void RPC_ApplyStun(float seconds, PlayerRef effectAuthority, RpcInfo info = default)
     {
-        if (!IsManagerStateAuthority(info.Source) || BananaGameManager.Instance == null ||
-            !BananaGameManager.Instance.MatchStarted)
+        if (info.Source != effectAuthority || !IsValidBananaEffectAuthority(effectAuthority))
         {
             return;
         }
@@ -421,14 +418,47 @@ public class PlayerController : NetworkBehaviour
             return;
         }
 
+        ApplyStunOnAuthority(seconds);
+    }
+
+    private void ApplyStunOnAuthority(float seconds)
+    {
         IsStunned = true;
         StunUntil = Runner.SimulationTime + seconds;
         GameFeedback.WorldPopup(transform.position + Vector3.up, "STUN", new Color(1f, 0.85f, 0.3f));
     }
 
-    public void ReceiveBananaHit(int points)
+    public void ReceiveBananaHit(int points, PlayerRef effectAuthority)
     {
-        if (!Object.HasStateAuthority || IsEliminated)
+        if (!IsValidBananaEffectAuthority(effectAuthority) || !IsValidBananaScore(points))
+        {
+            return;
+        }
+
+        if (!Object.HasStateAuthority)
+        {
+            RPC_ReceiveBananaHit(points, effectAuthority);
+            return;
+        }
+
+        ApplyBananaHitOnAuthority(points);
+    }
+
+    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+    private void RPC_ReceiveBananaHit(int points, PlayerRef effectAuthority, RpcInfo info = default)
+    {
+        if (info.Source != effectAuthority || !IsValidBananaEffectAuthority(effectAuthority) ||
+            !IsValidBananaScore(points) || IsEliminated)
+        {
+            return;
+        }
+
+        ApplyBananaHitOnAuthority(points);
+    }
+
+    private void ApplyBananaHitOnAuthority(int points)
+    {
+        if (IsEliminated)
         {
             return;
         }
@@ -445,6 +475,20 @@ public class PlayerController : NetworkBehaviour
         {
             BananaGameManager.Instance?.DeclareWinner(this, "100 puntos");
         }
+    }
+
+    private bool IsValidBananaEffectAuthority(PlayerRef source)
+    {
+        BananaGameManager manager = BananaGameManager.Instance;
+        return manager != null && manager.MatchStarted && manager.SelectedGame == MiniGameId.BananaRain &&
+               manager.Object.StateAuthority == source;
+    }
+
+    private static bool IsValidBananaScore(int points)
+    {
+        return points == BananaRushConfig.BananaNormalPoints ||
+               points == BananaRushConfig.BananaExplosivePoints ||
+               points == BananaRushConfig.BananaGreenPoints;
     }
 
     [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
@@ -574,10 +618,11 @@ public class PlayerController : NetworkBehaviour
             return;
         }
 
-        bool fromManager = info.Source == manager.Object.StateAuthority;
-        if (fromManager)
+        bool managerParkourScore = manager.SelectedGame == MiniGameId.Parkour &&
+                                   info.Source == manager.Object.StateAuthority;
+        if (managerParkourScore)
         {
-            if (manager.SelectedGame != MiniGameId.Parkour || score < 10 || score > 110)
+            if (score < 10 || score > 110)
             {
                 return;
             }

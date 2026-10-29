@@ -91,17 +91,6 @@ public class BananaController : NetworkBehaviour
             return;
         }
 
-        if (IsStunPeel)
-        {
-            player.ApplyStun(StunSeconds > 0f ? StunSeconds : 3f);
-            GameFeedback.WorldPopup(player.transform.position + Vector3.up, "CASCARA", new Color(1f, 0.85f, 0.25f));
-        }
-        else
-        {
-            int points = NetPointValue != 0 ? NetPointValue : _pointValue;
-            player.ReceiveBananaHit(points);
-        }
-
         RequestConsume(player.Object.InputAuthority);
     }
 
@@ -116,7 +105,7 @@ public class BananaController : NetworkBehaviour
         {
             if (IsValidConsumeClaim(claimant))
             {
-                DespawnSelf();
+                CommitConsume(claimant);
             }
         }
         else
@@ -130,8 +119,39 @@ public class BananaController : NetworkBehaviour
     {
         if (info.Source == claimant && IsValidConsumeClaim(claimant))
         {
-            DespawnSelf();
+            CommitConsume(claimant);
         }
+    }
+
+    private void CommitConsume(PlayerRef claimant)
+    {
+        if (Consumed)
+        {
+            return;
+        }
+
+        PlayerController player = FindClaimingPlayer(claimant);
+        if (player == null)
+        {
+            return;
+        }
+
+        PlayerRef bananaAuthority = Object.StateAuthority;
+        bool stunPeel = IsStunPeel;
+        int points = NetPointValue != 0 ? NetPointValue : _pointValue;
+        float stunSeconds = StunSeconds > 0f ? StunSeconds : 3f;
+        Consumed = true;
+
+        if (stunPeel)
+        {
+            player.ApplyStun(stunSeconds, bananaAuthority);
+        }
+        else
+        {
+            player.ReceiveBananaHit(points, bananaAuthority);
+        }
+
+        Runner.Despawn(Object);
     }
 
     private bool IsValidConsumeClaim(PlayerRef claimant)
@@ -142,17 +162,23 @@ public class BananaController : NetworkBehaviour
             return false;
         }
 
+        PlayerController player = FindClaimingPlayer(claimant);
+        return player != null &&
+               (player.transform.position - transform.position).sqrMagnitude <= 1.25f * 1.25f;
+    }
+
+    private static PlayerController FindClaimingPlayer(PlayerRef claimant)
+    {
         foreach (var player in FindObjectsByType<PlayerController>(FindObjectsSortMode.None))
         {
             if (player != null && player.IsSpawned && !player.IsEliminated &&
-                player.Object.InputAuthority == claimant &&
-                (player.transform.position - transform.position).sqrMagnitude <= 1.25f * 1.25f)
+                player.Object.InputAuthority == claimant)
             {
-                return true;
+                return player;
             }
         }
 
-        return false;
+        return null;
     }
 
     private void DespawnSelf()
