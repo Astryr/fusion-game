@@ -56,7 +56,7 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
     private bool _jumpQueued;
     private bool _actionQueued;
     private string _disconnectMessage;
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || UNITY_STANDALONE_WIN
     private const int RttWindowSize = 60;
     private readonly float[] _rttWindow = new float[RttWindowSize];
     private int _rttWindowCount;
@@ -89,7 +89,7 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
 
     private void Update()
     {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || UNITY_STANDALONE_WIN
         UpdateNetworkDiagnostics();
         if (!GameChat.IsTyping && Input.GetKeyDown(KeyCode.F3))
         {
@@ -228,7 +228,7 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         }
 
         _gameManagerSpawnRequested = false;
-    #if UNITY_EDITOR || DEVELOPMENT_BUILD
+    #if UNITY_EDITOR || UNITY_STANDALONE_WIN
         ResetNetworkDiagnostics();
     #endif
 
@@ -289,7 +289,7 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         return false;
     }
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || UNITY_STANDALONE_WIN
     private void ResetNetworkDiagnostics()
     {
         Array.Clear(_rttWindow, 0, _rttWindow.Length);

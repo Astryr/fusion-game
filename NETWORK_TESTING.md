@@ -2,7 +2,7 @@
 
 ## Instrumentacion
 
-En el Editor y en Development Builds, el juego muestra un overlay de red. **F3** lo oculta o muestra. El overlay toma una muestra de `NetworkRunner.GetPlayerRtt(PlayerRef.None)` cada 0.5 segundos y presenta RTT minimo, promedio y maximo en una ventana movil de hasta 30 segundos, mas una variacion suavizada del RTT y el total local acumulado de RPC de feedback recibidos durante la conexion. La ventana RTT se reinicia al reconectar.
+En el Editor y en cualquier build Windows (`UNITY_STANDALONE_WIN`), el juego muestra un overlay de red. **F3** lo oculta o muestra. El overlay toma una muestra de `NetworkRunner.GetPlayerRtt(PlayerRef.None)` cada 0.5 segundos y presenta RTT minimo, promedio y maximo en una ventana movil de hasta 30 segundos, mas una variacion suavizada del RTT y el total local acumulado de RPC de feedback recibidos durante la conexion. La ventana RTT se reinicia al reconectar.
 
 La variacion mostrada no es jitter de llegada de paquetes medido en el transporte: es una estimacion a partir de diferencias entre muestras de RTT. La perdida se inyecta con Network Conditions; el porcentaje configurado es la referencia conocida. Observar tambien pausas, acciones repetidas/perdidas, resultados inconsistentes y desconexiones durante cada perfil.
 
