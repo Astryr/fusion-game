@@ -243,8 +243,13 @@ public class PlayerController : NetworkBehaviour
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-    public void RPC_PrepareForMatch()
+    public void RPC_PrepareForMatch(RpcInfo info = default)
     {
+        if (!IsManagerStateAuthority(info.Source) || BananaGameManager.Instance.Phase != MatchPhase.Playing)
+        {
+            return;
+        }
+
         ApplyPrepareForMatch();
     }
 
@@ -284,8 +289,13 @@ public class PlayerController : NetworkBehaviour
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-    public void RPC_ResetForLobby()
+    public void RPC_ResetForLobby(RpcInfo info = default)
     {
+        if (!IsManagerStateAuthority(info.Source) || BananaGameManager.Instance.Phase != MatchPhase.Lobby)
+        {
+            return;
+        }
+
         ResetForLobby();
     }
 
@@ -301,8 +311,13 @@ public class PlayerController : NetworkBehaviour
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-    public void RPC_ForceUnready()
+    public void RPC_ForceUnready(RpcInfo info = default)
     {
+        if (!IsManagerStateAuthority(info.Source) || BananaGameManager.Instance.Phase != MatchPhase.Lobby)
+        {
+            return;
+        }
+
         IsReady = false;
     }
 
@@ -318,8 +333,16 @@ public class PlayerController : NetworkBehaviour
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-    public void RPC_Teleport(Vector3 position)
+    public void RPC_Teleport(Vector3 position, RpcInfo info = default)
     {
+        if (!IsManagerStateAuthority(info.Source) ||
+            BananaGameManager.Instance.Phase == MatchPhase.Results ||
+            Mathf.Abs(position.x) > BananaRushConfig.PlayerClampX ||
+            position.y < -2f || position.y > 25f)
+        {
+            return;
+        }
+
         ApplyTeleport(position);
     }
 
@@ -349,8 +372,14 @@ public class PlayerController : NetworkBehaviour
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-    public void RPC_Eliminate()
+    public void RPC_Eliminate(RpcInfo info = default)
     {
+        if ((info.Source != Object.InputAuthority && !IsManagerStateAuthority(info.Source)) ||
+            BananaGameManager.Instance == null || !BananaGameManager.Instance.MatchStarted)
+        {
+            return;
+        }
+
         if (!IsEliminated)
         {
             IsEliminated = true;
@@ -360,6 +389,12 @@ public class PlayerController : NetworkBehaviour
 
     public void ApplyStun(float seconds)
     {
+        seconds = Mathf.Clamp(seconds, 0f, 5f);
+        if (seconds <= 0f)
+        {
+            return;
+        }
+
         if (!Object.HasStateAuthority)
         {
             RPC_ApplyStun(seconds);
@@ -372,8 +407,20 @@ public class PlayerController : NetworkBehaviour
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-    public void RPC_ApplyStun(float seconds)
+    public void RPC_ApplyStun(float seconds, RpcInfo info = default)
     {
+        if (!IsManagerStateAuthority(info.Source) || BananaGameManager.Instance == null ||
+            !BananaGameManager.Instance.MatchStarted)
+        {
+            return;
+        }
+
+        seconds = Mathf.Clamp(seconds, 0f, 5f);
+        if (seconds <= 0f || IsEliminated)
+        {
+            return;
+        }
+
         IsStunned = true;
         StunUntil = Runner.SimulationTime + seconds;
         GameFeedback.WorldPopup(transform.position + Vector3.up, "STUN", new Color(1f, 0.85f, 0.3f));
@@ -394,11 +441,6 @@ public class PlayerController : NetworkBehaviour
         string label = points >= 0 ? $"+{points}" : points.ToString();
         GameFeedback.WorldPopup(transform.position + Vector3.up * 1.1f, label, color);
 
-        if (BananaGameManager.Instance != null && BananaGameManager.Instance.SelectedGame == MiniGameId.BananaRain)
-        {
-            BananaGameManager.Instance.RPC_ShowFeedback($"{DisplayName}: {label} ({Score})", points >= 0 ? 0 : 2);
-        }
-
         if (previous < BananaRushConfig.BananaTargetScore && Score >= BananaRushConfig.BananaTargetScore)
         {
             BananaGameManager.Instance?.DeclareWinner(this, "100 puntos");
@@ -414,7 +456,8 @@ public class PlayerController : NetworkBehaviour
         }
 
         IsReady = ready;
-        BananaGameManager.Instance.RPC_ShowFeedback(ready ? $"{DisplayName} esta LISTO" : $"{DisplayName} cancelo el ready", ready ? 0 : 2);
+        GameFeedback.Toast(ready ? "Estas LISTO" : "Cancelaste el ready",
+            ready ? new Color(0.55f, 1f, 0.6f) : new Color(1f, 0.45f, 0.4f));
     }
 
     public void RequestToggleReady()
@@ -514,7 +557,7 @@ public class PlayerController : NetworkBehaviour
         if (Heat >= 1f)
         {
             Eliminate();
-            BananaGameManager.Instance?.RPC_ShowFeedback($"{DisplayName} se lastimo el pecho", 2);
+            GameFeedback.Toast("Te lastimaste el pecho", new Color(1f, 0.45f, 0.4f));
         }
         else if (Score >= 50)
         {
@@ -523,15 +566,55 @@ public class PlayerController : NetworkBehaviour
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-    public void RPC_SetScore(int score)
+    public void RPC_SetScore(int score, RpcInfo info = default)
     {
+        BananaGameManager manager = BananaGameManager.Instance;
+        if (manager == null || manager.Phase != MatchPhase.Playing || score < 0)
+        {
+            return;
+        }
+
+        bool fromManager = info.Source == manager.Object.StateAuthority;
+        if (fromManager)
+        {
+            if (manager.SelectedGame != MiniGameId.Parkour || score < 10 || score > 110)
+            {
+                return;
+            }
+        }
+        else if (info.Source != Object.InputAuthority || !IsValidPlayerScoreChange(manager, score))
+        {
+            return;
+        }
+
         Score = score;
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-    public void RPC_AddCupScore(int points)
+    public void RPC_AddCupScore(int points, RpcInfo info = default)
     {
+        if (!IsManagerStateAuthority(info.Source) || points < 1 || points > 4)
+        {
+            return;
+        }
+
         CupScore = Mathf.Max(0, CupScore + points);
+    }
+
+    private bool IsValidPlayerScoreChange(BananaGameManager manager, int score)
+    {
+        return manager.SelectedGame switch
+        {
+            MiniGameId.MemoryPuzzle => score >= Score && score <= Score + 1 && score <= MemoryPuzzleMinigame.PairCount,
+            MiniGameId.TreeChop => score <= 30 && Mathf.Abs(score - Score) <= 1,
+            _ => false,
+        };
+    }
+
+    private static bool IsManagerStateAuthority(PlayerRef source)
+    {
+        BananaGameManager manager = BananaGameManager.Instance;
+        return manager != null && manager.Object != null && source == manager.Object.StateAuthority;
     }
 
     private void ResolveGround(ref Vector3 next)

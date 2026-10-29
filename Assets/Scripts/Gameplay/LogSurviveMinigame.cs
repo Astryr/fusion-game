@@ -53,7 +53,8 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
             _director.LogHoleMask = 0;
             _director.LogRockActive = false;
             _director.LogRockX = 0f;
-            _director.LogRockY = 0f;
+            _director.LogRockStartTime = 0f;
+            _director.LogRockSpeed = 0f;
         }
 
         RefreshPlatformVisual(_director.LogHoleMask);
@@ -329,8 +330,8 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
     {
         if (_director.LogRockActive)
         {
-            float nextY = _director.LogRockY - RockFallSpeed() * deltaTime;
-            _director.LogRockY = nextY;
+            float previousY = RockYAt(_director.MatchTime - deltaTime);
+            float currentY = RockYAt(_director.MatchTime);
 
             foreach (var player in players)
             {
@@ -340,7 +341,7 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
                 }
 
                 float playerBottom = player.transform.position.y;
-                if (nextY >= playerBottom - 0.2f && nextY <= playerBottom + 1.15f)
+                if (previousY >= playerBottom - 0.2f && currentY <= playerBottom + 1.15f)
                 {
                     player.Eliminate();
                     _director.RPC_ShowFeedback($"{player.DisplayName} fue golpeado por una piedra", 2);
@@ -352,7 +353,7 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
                 }
             }
 
-            if (nextY <= RockImpactY)
+            if (currentY <= RockImpactY)
             {
                 BreakPlatform(_director.LogRockX);
                 _director.LogRockActive = false;
@@ -379,6 +380,12 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
         return Mathf.Lerp(5.5f, 8.5f, Mathf.Clamp01(_director.MatchTime / 70f));
     }
 
+    private float RockYAt(float matchTime)
+    {
+        float elapsed = Mathf.Max(0f, matchTime - _director.LogRockStartTime);
+        return RockSpawnY - _director.LogRockSpeed * elapsed;
+    }
+
     private void SpawnRock()
     {
         int firstCell = _rng.Next(SegmentCount);
@@ -401,7 +408,8 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
 
         float left = -LogHalfWidth + cell * SegmentWidth;
         _director.LogRockX = left + SegmentWidth * (0.25f + (float)_rng.NextDouble() * 0.5f);
-        _director.LogRockY = RockSpawnY;
+        _director.LogRockStartTime = _director.MatchTime;
+        _director.LogRockSpeed = RockFallSpeed();
         _director.LogRockActive = true;
     }
 
@@ -505,7 +513,7 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
 
         if (active)
         {
-            _rockVisual.position = new Vector3(_director.LogRockX, _director.LogRockY, 0f);
+            _rockVisual.position = new Vector3(_director.LogRockX, RockYAt(_director.MatchTime), 0f);
         }
     }
 

@@ -340,6 +340,10 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         string stats = _rttWindowCount == 0
             ? "RTT: esperando muestras..."
             : $"RTT ms  prom {sum / _rttWindowCount:0} | min {min:0} | max {max:0}\nVariacion RTT: {_rttJitterMs:0.0} ms";
+        int feedbackRpcCount = BananaGameManager.Instance != null
+            ? BananaGameManager.Instance.FeedbackRpcCount
+            : 0;
+        stats += $"\nRPC de feedback recibidos: {feedbackRpcCount}";
         if (_networkDiagnosticsStyle == null)
         {
             _networkDiagnosticsStyle = new GUIStyle(GUI.skin.label)
@@ -352,12 +356,12 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
             };
         }
 
-        Rect panel = new Rect(12f, 12f, 430f, 84f);
+        Rect panel = new Rect(12f, 12f, 430f, 102f);
         Color previousColor = GUI.color;
         GUI.color = new Color(0.035f, 0.055f, 0.075f, 0.96f);
         GUI.Box(panel, GUIContent.none);
         GUI.color = previousColor;
-        GUI.Label(new Rect(24f, 18f, 406f, 72f), $"RED - DIAGNOSTICO (F3)\n{stats}", _networkDiagnosticsStyle);
+        GUI.Label(new Rect(24f, 18f, 406f, 90f), $"RED - DIAGNOSTICO (F3)\n{stats}", _networkDiagnosticsStyle);
     }
 #endif
 

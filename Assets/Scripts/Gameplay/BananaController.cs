@@ -84,12 +84,13 @@ public class BananaController : NetworkBehaviour
         }
 
         var player = other.GetComponent<PlayerController>();
-        if (player == null)
+        BananaGameManager manager = BananaGameManager.Instance;
+        if (player == null || !player.Object.HasInputAuthority || manager == null ||
+            !manager.MatchStarted || manager.SelectedGame != MiniGameId.BananaRain)
         {
             return;
         }
 
-        // El trigger corre en todos los clientes; ReceiveBananaHit se protege solo.
         if (IsStunPeel)
         {
             player.ApplyStun(StunSeconds > 0f ? StunSeconds : 3f);
@@ -101,10 +102,10 @@ public class BananaController : NetworkBehaviour
             player.ReceiveBananaHit(points);
         }
 
-        RequestConsume();
+        RequestConsume(player.Object.InputAuthority);
     }
 
-    private void RequestConsume()
+    private void RequestConsume(PlayerRef claimant)
     {
         if (Object == null || Consumed)
         {
@@ -113,18 +114,45 @@ public class BananaController : NetworkBehaviour
 
         if (Object.HasStateAuthority)
         {
-            DespawnSelf();
+            if (IsValidConsumeClaim(claimant))
+            {
+                DespawnSelf();
+            }
         }
         else
         {
-            RPC_RequestConsume();
+            RPC_RequestConsume(claimant);
         }
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-    private void RPC_RequestConsume()
+    private void RPC_RequestConsume(PlayerRef claimant, RpcInfo info = default)
     {
-        DespawnSelf();
+        if (info.Source == claimant && IsValidConsumeClaim(claimant))
+        {
+            DespawnSelf();
+        }
+    }
+
+    private bool IsValidConsumeClaim(PlayerRef claimant)
+    {
+        BananaGameManager manager = BananaGameManager.Instance;
+        if (Consumed || manager == null || !manager.MatchStarted || manager.SelectedGame != MiniGameId.BananaRain)
+        {
+            return false;
+        }
+
+        foreach (var player in FindObjectsByType<PlayerController>(FindObjectsSortMode.None))
+        {
+            if (player != null && player.IsSpawned && !player.IsEliminated &&
+                player.Object.InputAuthority == claimant &&
+                (player.transform.position - transform.position).sqrMagnitude <= 1.25f * 1.25f)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void DespawnSelf()

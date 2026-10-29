@@ -22,7 +22,8 @@ public class BananaGameManager : NetworkBehaviour
     [Networked] public int LogHoleMask { get; set; }
     [Networked] public NetworkBool LogRockActive { get; set; }
     [Networked] public float LogRockX { get; set; }
-    [Networked] public float LogRockY { get; set; }
+    [Networked] public float LogRockStartTime { get; set; }
+    [Networked] public float LogRockSpeed { get; set; }
     [Networked] public int RoundSeed { get; set; }
     [Networked] public int WinnerScore { get; set; }
     [Networked] public NetworkString<_32> WinnerName { get; set; }
@@ -33,6 +34,7 @@ public class BananaGameManager : NetworkBehaviour
     public bool MatchStarted => Phase == MatchPhase.Playing;
     public bool IsGameOver => Phase == MatchPhase.Results;
     public bool IsInLobby => Phase == MatchPhase.Lobby;
+    public int FeedbackRpcCount { get; private set; }
 
     private readonly List<IMiniGame> _minigames = new List<IMiniGame>();
     private IMiniGame _active;
@@ -223,8 +225,13 @@ public class BananaGameManager : NetworkBehaviour
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-    public void RPC_RequestSelectGame(int rawId)
+    public void RPC_RequestSelectGame(int rawId, RpcInfo info = default)
     {
+        if (info.Source != Object.StateAuthority)
+        {
+            return;
+        }
+
         SetSelectedGame(MiniGameNames.Clamp(rawId));
     }
 
@@ -261,24 +268,18 @@ public class BananaGameManager : NetworkBehaviour
 
     public void DeclareHighestScoreWinner(string detail)
     {
-        if (Phase != MatchPhase.Playing)
+        if (Phase != MatchPhase.Playing || !Object.HasStateAuthority)
         {
             return;
         }
 
-        if (Object.HasStateAuthority)
-        {
-            FinishMatch(FindHighestScore(), detail);
-            return;
-        }
-
-        RPC_DeclareHighestScore(detail);
+        FinishMatch(FindHighestScore(), detail);
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-    public void RPC_DeclareWinner(PlayerRef player, string detail)
+    public void RPC_DeclareWinner(PlayerRef player, string detail, RpcInfo info = default)
     {
-        if (Phase != MatchPhase.Playing)
+        if (Phase != MatchPhase.Playing || info.Source != player)
         {
             return;
         }
@@ -293,16 +294,24 @@ public class BananaGameManager : NetworkBehaviour
             }
         }
 
+        if (winner == null || winner.IsEliminated || !IsValidWinnerClaim(winner))
+        {
+            return;
+        }
+
         FinishMatch(winner, detail);
     }
 
-    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-    public void RPC_DeclareHighestScore(string detail)
+    private bool IsValidWinnerClaim(PlayerController candidate)
     {
-        if (Phase == MatchPhase.Playing)
+        return SelectedGame switch
         {
-            FinishMatch(FindHighestScore(), detail);
-        }
+            MiniGameId.BananaRain => candidate.Score >= BananaRushConfig.BananaTargetScore,
+            MiniGameId.MemoryPuzzle => candidate.Score >= MemoryPuzzleMinigame.PairCount,
+            MiniGameId.TreeChop => candidate.Score >= 30,
+            MiniGameId.ChestBeat => candidate.Score >= 50,
+            _ => false,
+        };
     }
 
     private PlayerController FindHighestScore()
@@ -353,9 +362,10 @@ public class BananaGameManager : NetworkBehaviour
         }
     }
 
-    [Rpc(RpcSources.All, RpcTargets.All)]
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     public void RPC_ShowFeedback(NetworkString<_64> message, int tone)
     {
+        FeedbackRpcCount++;
         Color color = tone switch
         {
             0 => new Color(0.55f, 1f, 0.60f),
