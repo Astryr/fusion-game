@@ -6,10 +6,21 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
 {
     public MiniGameId Id => MiniGameId.Parkour;
 
+    private const int AvalancheColumns = 8;
+    private const int AvalancheRows = 18;
+
     private BananaGameManager _director;
     private Sprite _groundSprite;
     private Sprite _dirtSprite;
     private Sprite _flagSprite;
+    private Sprite _avalancheSprite;
+    private Texture2D _avalancheTexture;
+    private Transform _avalancheRoot;
+    private Transform[] _coconutPieces;
+    private Vector3[] _coconutBasePositions;
+    private float[] _coconutFallSpeeds;
+    private float[] _coconutSwayPhases;
+    private float[] _coconutSpinSpeeds;
     private bool _started;
     private bool _courseReady;
     private readonly HashSet<int> _finishedIds = new HashSet<int>();
@@ -148,6 +159,8 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
         _started = false;
         _courseReady = false;
         MiniGameWorld.Clear();
+        ResetAvalancheVisuals();
+        ReleaseAvalancheAsset();
         StageBackdrop.Clear();
         Camera cam = Camera.main;
         if (cam != null)
@@ -199,24 +212,180 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
         float height = cam != null ? cam.orthographicSize * 2.6f : 20f;
         float width = BananaRushConfig.ParkourAvalancheWidth;
 
-        Transform root = MiniGameWorld.GetRoot();
-        Transform wall = root.Find("Avalanche");
-        if (wall == null)
+        if (_avalancheRoot == null)
         {
-            Sprite slab = CreateFallbackSprite(Color.white);
-            GameObject go = MiniGameWorld.SpriteObject("Avalanche", slab, Vector3.zero, Vector3.one, "Props", 12);
-            var renderer = go.GetComponent<SpriteRenderer>();
-            renderer.color = new Color(1f, 1f, 1f, 0.94f);
-            wall = go.transform;
+            BuildAvalancheVisual(width, height);
         }
 
-        wall.localScale = new Vector3(width, height, 1f);
-        wall.position = new Vector3(_director.AvalancheX - width * 0.35f, camY, 0f);
+        _avalancheRoot.position = new Vector3(_director.AvalancheX - width * 0.35f, camY, 0f);
+        float time = Time.time;
+        float spacingY = height / AvalancheRows;
+        for (int i = 0; i < _coconutPieces.Length; i++)
+        {
+            Vector3 basePosition = _coconutBasePositions[i];
+            float distanceFromTop = height * 0.5f - basePosition.y;
+            float fall = Mathf.Repeat(distanceFromTop + time * _coconutFallSpeeds[i], height);
+            float sway = Mathf.Sin(time * 2.4f + _coconutSwayPhases[i]) * spacingY * 0.12f;
+            _coconutPieces[i].localPosition = new Vector3(basePosition.x + sway, height * 0.5f - fall, basePosition.z);
+            _coconutPieces[i].localRotation = Quaternion.Euler(0f, 0f, time * _coconutSpinSpeeds[i] + _coconutSwayPhases[i] * 35f);
+        }
+    }
+
+    private void BuildAvalancheVisual(float width, float height)
+    {
+        if (_avalancheSprite == null)
+        {
+            _avalancheTexture = CreateCoconutSpriteTexture();
+            _avalancheSprite = Sprite.Create(_avalancheTexture,
+                new Rect(0f, 0f, _avalancheTexture.width, _avalancheTexture.height),
+                new Vector2(0.5f, 0.5f), 64f, 0, SpriteMeshType.FullRect);
+        }
+
+        var root = new GameObject("CoconutAvalanche");
+        root.transform.SetParent(MiniGameWorld.GetRoot(), false);
+        _avalancheRoot = root.transform;
+
+        int count = AvalancheColumns * AvalancheRows;
+        _coconutPieces = new Transform[count];
+        _coconutBasePositions = new Vector3[count];
+        _coconutFallSpeeds = new float[count];
+        _coconutSwayPhases = new float[count];
+        _coconutSpinSpeeds = new float[count];
+
+        float spacingX = width / AvalancheColumns;
+        float spacingY = height / AvalancheRows;
+        int index = 0;
+        for (int row = 0; row < AvalancheRows; row++)
+        {
+            for (int column = 0; column < AvalancheColumns; column++)
+            {
+                var piece = new GameObject($"Coconut_{index}");
+                piece.transform.SetParent(_avalancheRoot, false);
+                piece.transform.localPosition = new Vector3(
+                    -width * 0.5f + (column + 0.5f) * spacingX + Random.Range(-spacingX * 0.12f, spacingX * 0.12f),
+                    -height * 0.5f + (row + 0.5f) * spacingY,
+                    Random.Range(-0.02f, 0.02f));
+                float size = Mathf.Min(spacingX, spacingY) * Random.Range(1.02f, 1.22f);
+                piece.transform.localScale = Vector3.one * size;
+                piece.transform.localRotation = Quaternion.Euler(0f, 0f, Random.Range(-25f, 25f));
+
+                var renderer = piece.AddComponent<SpriteRenderer>();
+                renderer.sprite = _avalancheSprite;
+                renderer.color = Color.Lerp(new Color(0.74f, 0.71f, 0.64f), Color.white, Random.Range(0.1f, 0.45f));
+                renderer.sortingLayerName = "Props";
+                renderer.sortingOrder = 12 + Random.Range(0, 3);
+
+                _coconutPieces[index] = piece.transform;
+                _coconutBasePositions[index] = piece.transform.localPosition;
+                _coconutFallSpeeds[index] = Random.Range(2.6f, 5.2f);
+                _coconutSwayPhases[index] = Random.Range(0f, Mathf.PI * 2f);
+                _coconutSpinSpeeds[index] = Random.Range(-100f, 100f);
+                index++;
+            }
+        }
+    }
+
+    private void ReleaseAvalancheAsset()
+    {
+        if (_avalancheSprite != null)
+        {
+            Destroy(_avalancheSprite);
+            _avalancheSprite = null;
+        }
+
+        if (_avalancheTexture != null)
+        {
+            Destroy(_avalancheTexture);
+            _avalancheTexture = null;
+        }
+    }
+
+    private void ResetAvalancheVisuals()
+    {
+        _avalancheRoot = null;
+        _coconutPieces = null;
+        _coconutBasePositions = null;
+        _coconutFallSpeeds = null;
+        _coconutSwayPhases = null;
+        _coconutSpinSpeeds = null;
+    }
+
+    private static Texture2D CreateCoconutSpriteTexture()
+    {
+        const int size = 64;
+        const float radiusX = 0.83f;
+        const float radiusY = 0.88f;
+        var pixels = new Color32[size * size];
+        var random = new System.Random(4817);
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float nx = (x - (size - 1) * 0.5f) / (size * 0.5f);
+                float ny = (y - (size - 1) * 0.5f) / (size * 0.5f);
+                float angle = Mathf.Atan2(ny, nx);
+                float edge = 0.84f + Mathf.Sin(angle * 5f + 0.7f) * 0.045f + Mathf.Sin(angle * 9f) * 0.025f;
+                float radius = Mathf.Sqrt(nx * nx / (radiusX * radiusX) + ny * ny / (radiusY * radiusY));
+                if (radius > edge)
+                {
+                    continue;
+                }
+
+                float fibers = Mathf.Sin(nx * 48f + ny * 17f) * 0.45f +
+                               Mathf.Sin(nx * 19f - ny * 37f) * 0.3f +
+                               Mathf.Sin((nx + ny) * 73f) * 0.15f;
+                Color32 color = fibers > 0.38f
+                    ? new Color32(157, 105, 61, 255)
+                    : fibers < -0.42f
+                        ? new Color32(79, 45, 28, 255)
+                        : new Color32(116, 69, 40, 255);
+                if (radius > edge - 0.1f)
+                {
+                    color = new Color32(54, 33, 25, 255);
+                }
+                else if (nx < -0.22f && ny < 0.48f)
+                {
+                    color = new Color32(173, 119, 68, 255);
+                }
+
+                bool eyeBand = ny > 0.02f && ny < 0.38f;
+                bool eye = eyeBand &&
+                           ((nx + 0.2f) * (nx + 0.2f) < 0.0025f || nx * nx < 0.0025f || (nx - 0.2f) * (nx - 0.2f) < 0.0025f);
+                if (eye)
+                {
+                    color = new Color32(37, 25, 22, 255);
+                }
+                else if (eyeBand &&
+                         ((nx + 0.2f) * (nx + 0.2f) < 0.007f || nx * nx < 0.007f || (nx - 0.2f) * (nx - 0.2f) < 0.007f))
+                {
+                    color = new Color32(187, 139, 84, 255);
+                }
+
+                if (random.NextDouble() < 0.025 && radius < edge - 0.14f)
+                {
+                    color = new Color32(83, 49, 31, 255);
+                }
+
+                pixels[y * size + x] = color;
+            }
+        }
+
+        var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+        {
+            filterMode = FilterMode.Point,
+            wrapMode = TextureWrapMode.Clamp,
+            name = "Parkour_Coconut"
+        };
+        texture.SetPixels32(pixels);
+        texture.Apply(false, false);
+        return texture;
     }
 
     private void PrepareCourse(bool hideLobbyGround)
     {
         MiniGameWorld.Clear();
+        ResetAvalancheVisuals();
         _finishedIds.Clear();
         BuildCourse();
 
