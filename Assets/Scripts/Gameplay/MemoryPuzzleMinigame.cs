@@ -159,6 +159,9 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
             new Vector2(0.5f, 0.54f), new Vector2(0.5f, 0.54f), new Vector2(-360, -200), new Vector2(360, 210));
 
         _status = UIFactory.CreateText(panel, "Memotest", 16, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.35f));
+        var statusOutline = _status.gameObject.AddComponent<Outline>();
+        statusOutline.effectColor = new Color(0.12f, 0.05f, 0.02f, 0.95f);
+        statusOutline.effectDistance = new Vector2(1.5f, -1.5f);
         UIFactory.SetRect(_status.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(8, 8), new Vector2(-8, 44));
 
         const float pad = 16f;
