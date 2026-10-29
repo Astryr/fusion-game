@@ -56,6 +56,17 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
     private bool _jumpQueued;
     private bool _actionQueued;
     private string _disconnectMessage;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    private const int RttWindowSize = 60;
+    private readonly float[] _rttWindow = new float[RttWindowSize];
+    private int _rttWindowCount;
+    private int _rttWindowIndex;
+    private float _rttSampleTimer;
+    private float _previousRttMs = -1f;
+    private float _rttJitterMs;
+    private bool _showNetworkDiagnostics = true;
+    private GUIStyle _networkDiagnosticsStyle;
+#endif
 
     public string ConsumeDisconnectMessage()
     {
@@ -78,6 +89,14 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
 
     private void Update()
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        UpdateNetworkDiagnostics();
+        if (!GameChat.IsTyping && Input.GetKeyDown(KeyCode.F3))
+        {
+            _showNetworkDiagnostics = !_showNetworkDiagnostics;
+        }
+#endif
+
         if (GameChat.IsTyping)
         {
             _jumpQueued = false;
@@ -266,6 +285,81 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         Runner = null;
         return false;
     }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    private void UpdateNetworkDiagnostics()
+    {
+        if (Runner == null || !Runner.IsRunning)
+        {
+            return;
+        }
+
+        _rttSampleTimer -= Time.unscaledDeltaTime;
+        if (_rttSampleTimer > 0f)
+        {
+            return;
+        }
+
+        _rttSampleTimer = 0.5f;
+        float rttMs = (float)(Runner.GetPlayerRtt(PlayerRef.None) * 1000d);
+        if (rttMs <= 0f)
+        {
+            return;
+        }
+
+        if (_previousRttMs >= 0f)
+        {
+            float delta = Mathf.Abs(rttMs - _previousRttMs);
+            _rttJitterMs += (delta - _rttJitterMs) * 0.125f;
+        }
+
+        _previousRttMs = rttMs;
+        _rttWindow[_rttWindowIndex] = rttMs;
+        _rttWindowIndex = (_rttWindowIndex + 1) % RttWindowSize;
+        _rttWindowCount = Mathf.Min(_rttWindowCount + 1, RttWindowSize);
+    }
+
+    private void OnGUI()
+    {
+        if (!_showNetworkDiagnostics || Runner == null || !Runner.IsRunning)
+        {
+            return;
+        }
+
+        float sum = 0f;
+        float min = float.MaxValue;
+        float max = 0f;
+        for (int i = 0; i < _rttWindowCount; i++)
+        {
+            float sample = _rttWindow[i];
+            sum += sample;
+            min = Mathf.Min(min, sample);
+            max = Mathf.Max(max, sample);
+        }
+
+        string stats = _rttWindowCount == 0
+            ? "RTT: esperando muestras..."
+            : $"RTT ms  prom {sum / _rttWindowCount:0} | min {min:0} | max {max:0}\nVariacion RTT: {_rttJitterMs:0.0} ms";
+        if (_networkDiagnosticsStyle == null)
+        {
+            _networkDiagnosticsStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 16,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleLeft,
+                wordWrap = true,
+                normal = { textColor = Color.white },
+            };
+        }
+
+        Rect panel = new Rect(12f, 12f, 430f, 84f);
+        Color previousColor = GUI.color;
+        GUI.color = new Color(0.035f, 0.055f, 0.075f, 0.96f);
+        GUI.Box(panel, GUIContent.none);
+        GUI.color = previousColor;
+        GUI.Label(new Rect(24f, 18f, 406f, 72f), $"RED - DIAGNOSTICO (F3)\n{stats}", _networkDiagnosticsStyle);
+    }
+#endif
 
     private void DestroyRunner(NetworkRunner runner)
     {

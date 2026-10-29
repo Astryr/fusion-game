@@ -416,15 +416,26 @@ public class GameHUDController : MonoBehaviour
             winner = "Nadie";
         }
 
-        if (manager.SelectedGame == MiniGameId.Parkour)
+        if (manager.SoloDefeat)
+        {
+            _endScreenText.fontSize = 48;
+            _endScreenText.color = new Color(1f, 0.42f, 0.36f);
+            string detail = manager.ResultDetail.ToString();
+            _endScreenText.text = string.IsNullOrEmpty(detail)
+                ? "DERROTA"
+                : $"DERROTA\n{detail.ToUpperInvariant()}";
+        }
+        else if (manager.SelectedGame == MiniGameId.Parkour)
         {
             _endScreenText.fontSize = 30;
+            _endScreenText.color = new Color(1f, 0.82f, 0.20f);
             string board = manager.ResultsBoard.ToString();
             _endScreenText.text = string.IsNullOrEmpty(board) ? BuildParkourResults(manager.WinnerName.ToString()) : board;
         }
         else
         {
             _endScreenText.fontSize = 48;
+            _endScreenText.color = new Color(1f, 0.82f, 0.20f);
             _endScreenText.text = $"{winner.ToUpper()} GANO\nPUNTOS: {manager.WinnerScore}";
         }
 

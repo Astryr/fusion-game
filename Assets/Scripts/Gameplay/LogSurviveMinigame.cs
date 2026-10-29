@@ -5,14 +5,14 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
 {
     public MiniGameId Id => MiniGameId.LogSurvive;
 
-    private const float LogHalfWidth = 8.5f;
+    private const float LogHalfWidth = 12f;
     private const int SegmentCount = 26;
     private const float SegmentWidth = LogHalfWidth * 2f / SegmentCount;
     private const float PlatformThickness = 1.05f;
     private const float LogVisualHeight = 1.75f;
     private const float PlatformTopY = 0f;
     private const float RockSpawnY = 9f;
-    private const float RockVisualHeight = 1.65f;
+    private const float RockVisualHeight = 1.25f;
     private const float RockImpactY = PlatformTopY + RockVisualHeight * 0.5f;
     private const float DeathY = -8f;
     private const float MatchDuration = 95f;
@@ -89,6 +89,7 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
         UpdateRockVisual();
 
         PlayerController[] players = _director.GetPlayers();
+        bool soloRun = _director.AllowSoloPractice && players.Length == 1;
         foreach (var player in players)
         {
             if (player.IsEliminated)
@@ -104,12 +105,22 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
             }
         }
 
+        if (hasAuthority && soloRun && players[0].IsEliminated)
+        {
+            _director.DeclareSoloDefeat("Caíste al vacío");
+            return;
+        }
+
         if (!hasAuthority)
         {
             return;
         }
 
         TickRock(deltaTime, players);
+        if (_director.Phase != MatchPhase.Playing)
+        {
+            return;
+        }
 
         int alive = 0;
         PlayerController last = null;
@@ -122,11 +133,11 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
             }
         }
 
-        if (!_director.AllowSoloPractice && alive <= 1 && players.Length > 1)
+        if (!soloRun && alive <= 1 && players.Length > 1)
         {
             _director.DeclareWinner(last, "ultimo en el tronco");
         }
-        else if (!_director.AllowSoloPractice && _director.MatchTime >= MatchDuration)
+        else if (!soloRun && _director.MatchTime >= MatchDuration)
         {
             _director.DeclareWinner(ClosestToCenter() ?? last, "aguanto mas");
         }
@@ -180,7 +191,7 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
             new Vector2(0.5f, 0.5f), 32f, 0, SpriteMeshType.FullRect, new Vector4(20f, 8f, 20f, 8f));
         _stoneTexture = CreateStoneTexture();
         _stoneSprite = Sprite.Create(_stoneTexture, new Rect(0f, 0f, _stoneTexture.width, _stoneTexture.height),
-            new Vector2(0.5f, 0.5f), 56f, 0, SpriteMeshType.FullRect);
+            new Vector2(0.5f, 0.5f), 70f, 0, SpriteMeshType.FullRect);
     }
 
     private void ReleaseVisualAssets()
@@ -323,7 +334,7 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
 
             foreach (var player in players)
             {
-                if (player.IsEliminated || Mathf.Abs(player.transform.position.x - _director.LogRockX) > 1f)
+                if (player.IsEliminated || Mathf.Abs(player.transform.position.x - _director.LogRockX) > 0.7f)
                 {
                     continue;
                 }
@@ -333,6 +344,11 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
                 {
                     player.Eliminate();
                     _director.RPC_ShowFeedback($"{player.DisplayName} fue golpeado por una piedra", 2);
+                    if (_director.AllowSoloPractice && players.Length == 1)
+                    {
+                        _director.DeclareSoloDefeat("Te golpeó una piedra");
+                        return;
+                    }
                 }
             }
 
@@ -355,12 +371,12 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
 
     private float RockInterval()
     {
-        return Mathf.Lerp(3.2f, 1.45f, Mathf.Clamp01(_director.MatchTime / 70f));
+        return Mathf.Lerp(1.55f, 0.6f, Mathf.Clamp01(_director.MatchTime / 70f));
     }
 
     private float RockFallSpeed()
     {
-        return Mathf.Lerp(4f, 6.5f, Mathf.Clamp01(_director.MatchTime / 70f));
+        return Mathf.Lerp(5.5f, 8.5f, Mathf.Clamp01(_director.MatchTime / 70f));
     }
 
     private void SpawnRock()

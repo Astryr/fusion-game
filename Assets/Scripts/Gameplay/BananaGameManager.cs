@@ -26,6 +26,8 @@ public class BananaGameManager : NetworkBehaviour
     [Networked] public int RoundSeed { get; set; }
     [Networked] public int WinnerScore { get; set; }
     [Networked] public NetworkString<_32> WinnerName { get; set; }
+    [Networked] public NetworkBool SoloDefeat { get; set; }
+    [Networked] public NetworkString<_64> ResultDetail { get; set; }
     [Networked] public NetworkString<_256> ResultsBoard { get; set; }
 
     public bool MatchStarted => Phase == MatchPhase.Playing;
@@ -246,6 +248,17 @@ public class BananaGameManager : NetworkBehaviour
         }
     }
 
+    public void DeclareSoloDefeat(string detail)
+    {
+        if (Phase != MatchPhase.Playing || !AllowSoloPractice || !Object.HasStateAuthority || GetPlayers().Length != 1)
+        {
+            return;
+        }
+
+        SoloDefeat = true;
+        FinishMatch(null, detail);
+    }
+
     public void DeclareHighestScoreWinner(string detail)
     {
         if (Phase != MatchPhase.Playing)
@@ -324,6 +337,8 @@ public class BananaGameManager : NetworkBehaviour
         MatchTime = 0f;
         WinnerName = default;
         WinnerScore = 0;
+        SoloDefeat = false;
+        ResultDetail = default;
         ResultsBoard = default;
         SetSessionOpen(true);
         ResetPlayersForLobby();
@@ -393,6 +408,8 @@ public class BananaGameManager : NetworkBehaviour
         RoundSeed = Random.Range(1, int.MaxValue);
         WinnerName = default;
         WinnerScore = 0;
+        SoloDefeat = false;
+        ResultDetail = default;
         ResultsBoard = default;
 
         foreach (var player in GetPlayers())
@@ -405,8 +422,9 @@ public class BananaGameManager : NetworkBehaviour
 
     private void FinishMatch(PlayerController winner, string detail)
     {
-        string name = winner != null ? winner.DisplayName : "Nadie";
+        string name = winner != null ? winner.DisplayName : SoloDefeat ? "Derrota" : "Nadie";
         WinnerName = name;
+        ResultDetail = detail;
         ResultsBoard = SelectedGame == MiniGameId.Parkour ? BuildParkourBoard(winner) : default;
         int score = winner != null ? winner.Score : 0;
         if (SelectedGame == MiniGameId.MemoryPuzzle)
@@ -418,7 +436,7 @@ public class BananaGameManager : NetworkBehaviour
         AwardCupPoints(winner);
         Phase = MatchPhase.Results;
         string reason = string.IsNullOrEmpty(detail) ? string.Empty : $" ({detail})";
-        RPC_ShowFeedback($"{name} gana{reason}", 0);
+        RPC_ShowFeedback(SoloDefeat ? $"Derrota{reason}" : $"{name} gana{reason}", SoloDefeat ? 2 : 0);
     }
 
     private string BuildParkourBoard(PlayerController winner)
