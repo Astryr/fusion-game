@@ -85,7 +85,7 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
 
     public void OnMatchEnded()
     {
-        _playing = false;
+        Cleanup();
     }
 
     public void Cleanup()

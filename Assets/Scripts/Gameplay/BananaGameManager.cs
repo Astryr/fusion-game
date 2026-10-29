@@ -19,6 +19,10 @@ public class BananaGameManager : NetworkBehaviour
     [Networked] public float OvertimeRemaining { get; set; }
     [Networked] public float AvalancheX { get; set; }
     [Networked] public float LogHalfWidth { get; set; }
+    [Networked] public int LogHoleMask { get; set; }
+    [Networked] public NetworkBool LogRockActive { get; set; }
+    [Networked] public float LogRockX { get; set; }
+    [Networked] public float LogRockY { get; set; }
     [Networked] public int RoundSeed { get; set; }
     [Networked] public int WinnerScore { get; set; }
     [Networked] public NetworkString<_32> WinnerName { get; set; }

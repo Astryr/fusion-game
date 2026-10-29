@@ -29,7 +29,7 @@ public static class MiniGameNames
     {
         "Atrapa bananas (+5). Evita las explosivas (-10). Las verdes (+20) son raras.",
         "Quietos en la salida. Al 0 corren. Si te caes, ves al que va primero.",
-        "Quedate en el tronco. Empuja a los demas y cuidado con las cascaras.",
+        "Sobrevive en el tronco. Esquiva las piedras y los agujeros.",
         "Spamea ESPACIO con ritmo. Si te pasas, el pecho se pone rojo y perdes.",
         "Cada uno tiene su tablero. 9 pares. 7s para mirar. El primero en completar gana.",
         "Apreta la tecla que aparece. Las rojas son trampa. Primero a 30 gana.",
