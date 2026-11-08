@@ -263,6 +263,9 @@ public class PlayerController : NetworkBehaviour
         _grounded = true;
         _verticalVelocity = 0f;
         NetGrounded = true;
+
+        BananaGameManager manager = BananaGameManager.Instance;
+        RankingService.BeginMatch(manager != null ? manager.GetPlayers().Length : 1, manager != null && manager.AllowSoloPractice);
     }
 
     public void ResetForLobby()
@@ -463,17 +466,18 @@ public class PlayerController : NetworkBehaviour
             return;
         }
 
+        MatchConfig rules = LiveConfig.Match;
         int previous = Score;
         Score = Mathf.Max(0, Score + points);
-        Color color = points >= BananaRushConfig.BananaGreenPoints
+        Color color = points >= rules.BananaGreenPoints
             ? new Color(0.35f, 1f, 0.4f)
             : points >= 0 ? new Color(1f, 0.9f, 0.2f) : new Color(1f, 0.35f, 0.25f);
         string label = points >= 0 ? $"+{points}" : points.ToString();
         GameFeedback.WorldPopup(transform.position + Vector3.up * 1.1f, label, color);
 
-        if (previous < BananaRushConfig.BananaTargetScore && Score >= BananaRushConfig.BananaTargetScore)
+        if (previous < rules.BananaTargetScore && Score >= rules.BananaTargetScore)
         {
-            BananaGameManager.Instance?.DeclareWinner(this, "100 puntos");
+            BananaGameManager.Instance?.DeclareWinner(this, $"{rules.BananaTargetScore} puntos");
         }
     }
 
@@ -486,9 +490,10 @@ public class PlayerController : NetworkBehaviour
 
     private static bool IsValidBananaScore(int points)
     {
-        return points == BananaRushConfig.BananaNormalPoints ||
-               points == BananaRushConfig.BananaExplosivePoints ||
-               points == BananaRushConfig.BananaGreenPoints;
+        MatchConfig rules = LiveConfig.Match;
+        return points == rules.BananaNormalPoints ||
+               points == rules.BananaExplosivePoints ||
+               points == rules.BananaGreenPoints;
     }
 
     [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
@@ -533,6 +538,11 @@ public class PlayerController : NetworkBehaviour
     {
         // Source puede venir vacio; solo se descarta si dice ser otro jugador.
         if (info.Source != PlayerRef.None && info.Source != Object.InputAuthority)
+        {
+            return;
+        }
+
+        if (!LiveConfig.Match.ChatEnabled)
         {
             return;
         }
@@ -603,7 +613,7 @@ public class PlayerController : NetworkBehaviour
             Eliminate();
             GameFeedback.Toast("Te lastimaste el pecho", new Color(1f, 0.45f, 0.4f));
         }
-        else if (Score >= 50)
+        else if (Score >= LiveConfig.Match.ChestTarget)
         {
             BananaGameManager.Instance?.DeclareWinner(this, "el mas fuerte");
         }
@@ -638,12 +648,13 @@ public class PlayerController : NetworkBehaviour
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
     public void RPC_AddCupScore(int points, RpcInfo info = default)
     {
-        if (!IsManagerStateAuthority(info.Source) || points < 1 || points > 4)
+        if (!IsManagerStateAuthority(info.Source) || points < 1 || points > 4 * LiveConfig.Match.CupMultiplier)
         {
             return;
         }
 
         CupScore = Mathf.Max(0, CupScore + points);
+        RankingService.OnCupPointsAwarded(points);
     }
 
     private bool IsValidPlayerScoreChange(BananaGameManager manager, int score)
@@ -651,7 +662,7 @@ public class PlayerController : NetworkBehaviour
         return manager.SelectedGame switch
         {
             MiniGameId.MemoryPuzzle => score >= Score && score <= Score + 1 && score <= MemoryPuzzleMinigame.PairCount,
-            MiniGameId.TreeChop => score <= 30 && Mathf.Abs(score - Score) <= 1,
+            MiniGameId.TreeChop => score <= LiveConfig.Match.TreeChopTarget && Mathf.Abs(score - Score) <= 1,
             _ => false,
         };
     }

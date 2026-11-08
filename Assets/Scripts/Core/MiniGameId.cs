@@ -41,8 +41,21 @@ public static class MiniGameNames
         return index >= 0 && index < DisplayNames.Length ? DisplayNames[index] : id.ToString();
     }
 
+    // Los minijuegos con puntajes configurables arman la ayuda con las reglas vigentes.
     public static string Hint(MiniGameId id)
     {
+        MatchConfig rules = LiveConfig.Match;
+        switch (id)
+        {
+            case MiniGameId.BananaRain:
+                return $"Atrapa bananas (+{rules.BananaNormalPoints}). Evita las explosivas ({rules.BananaExplosivePoints}). " +
+                       $"Las verdes (+{rules.BananaGreenPoints}) son raras.";
+            case MiniGameId.MemoryPuzzle:
+                return $"Cada uno tiene su tablero. 9 pares. {rules.MemotestPeekSeconds:0.#}s para mirar. El primero en completar gana.";
+            case MiniGameId.TreeChop:
+                return $"Apreta la tecla que aparece. Las rojas son trampa. Primero a {rules.TreeChopTarget} gana.";
+        }
+
         int index = (int)id;
         return index >= 0 && index < ShortHints.Length ? ShortHints[index] : string.Empty;
     }

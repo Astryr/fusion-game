@@ -57,7 +57,7 @@ public class ChestBeatMinigame : MonoBehaviour, IMiniGame
                 leader = player;
             }
 
-            if (player.Score >= 50)
+            if (player.Score >= LiveConfig.Match.ChestTarget)
             {
                 _director.DeclareWinner(player, "el mas fuerte");
                 return;

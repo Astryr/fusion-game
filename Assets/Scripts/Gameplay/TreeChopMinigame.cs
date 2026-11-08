@@ -12,6 +12,8 @@ public class TreeChopMinigame : MonoBehaviour, IMiniGame
         KeyCode.B, KeyCode.N, KeyCode.M, KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3,
     };
 
+    private static int Target => LiveConfig.Match.TreeChopTarget;
+
     private BananaGameManager _director;
     private Canvas _canvas;
     private Text _keyLabel;
@@ -77,7 +79,7 @@ public class TreeChopMinigame : MonoBehaviour, IMiniGame
         {
             foreach (var player in _director.GetPlayers())
             {
-                if (player.Score >= 30)
+                if (player.Score >= Target)
                 {
                     _director.DeclareWinner(player, "rompio el arbol");
                     return;
@@ -162,7 +164,7 @@ public class TreeChopMinigame : MonoBehaviour, IMiniGame
         int next = Mathf.Max(0, PlayerController.Local.Score + delta);
         PlayerController.Local.RPC_SetScore(next);
         Color color = delta >= 0 ? new Color(0.6f, 1f, 0.5f) : new Color(1f, 0.45f, 0.4f);
-        GameFeedback.Toast($"{reason}  ({next}/30)", color);
+        GameFeedback.Toast($"{reason}  ({next}/{Target})", color);
         if (delta > 0)
         {
             GameFeedback.WorldPopup(PlayerController.Local.transform.position + Vector3.up, "+1", color);
@@ -188,10 +190,10 @@ public class TreeChopMinigame : MonoBehaviour, IMiniGame
         _keyLabel.color = _troll ? new Color(1f, 0.25f, 0.22f) : new Color(1f, 0.86f, 0.25f);
         _hintLabel.text = _troll ? "NO la apretes. Dejala pasar." : "¡Apreta esta tecla!";
         int score = PlayerController.Local != null ? PlayerController.Local.Score : 0;
-        _scoreLabel.text = $"Golpes {score}/30   |   {Mathf.CeilToInt(Mathf.Max(0f, _timeLeft))}s";
+        _scoreLabel.text = $"Golpes {score}/{Target}   |   {Mathf.CeilToInt(Mathf.Max(0f, _timeLeft))}s";
         if (_treeFill != null)
         {
-            _treeFill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(score / 30f), 1f);
+            _treeFill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(score / (float)Target), 1f);
         }
     }
 
@@ -212,7 +214,7 @@ public class TreeChopMinigame : MonoBehaviour, IMiniGame
         _keyLabel = UIFactory.CreateTitleText(panel, "Q", 54, new Color(1f, 0.86f, 0.25f), new Color(0.2f, 0.1f, 0.05f));
         UIFactory.SetRect(_keyLabel.rectTransform, new Vector2(0, 0.25f), new Vector2(1, 0.85f), new Vector2(10, 0), new Vector2(-10, 0));
 
-        _scoreLabel = UIFactory.CreateText(panel, "Golpes 0/30", 15, TextAnchor.MiddleCenter, new Color(0.85f, 0.9f, 0.8f));
+        _scoreLabel = UIFactory.CreateText(panel, $"Golpes 0/{Target}", 15, TextAnchor.MiddleCenter, new Color(0.85f, 0.9f, 0.8f));
         UIFactory.SetRect(_scoreLabel.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(8, 8), new Vector2(-8, 30));
 
         var bar = UIFactory.CreatePanel(_canvas.transform, "TreeBarBack", new Color(0.15f, 0.12f, 0.08f, 0.9f),

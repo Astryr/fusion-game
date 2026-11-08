@@ -26,7 +26,7 @@ public class BananaController : NetworkBehaviour
 
     public override void Render()
     {
-        if (NetPointValue >= BananaRushConfig.BananaGreenPoints)
+        if (NetPointValue >= LiveConfig.Match.BananaGreenPoints)
         {
             var renderer = GetComponent<SpriteRenderer>();
             if (renderer != null)

@@ -6,7 +6,8 @@ public class BananaGameManager : NetworkBehaviour
 {
     public static BananaGameManager Instance { get; private set; }
 
-    [SerializeField] private float _countdownDuration = 5f;
+    // Reglas de la partida: las publica el host y todos juegan con esta copia (ver LiveConfig.Match).
+    [Networked] public MatchConfig Config { get; set; }
 
     [Networked] public NetworkBool AllowSoloPractice { get; set; }
 
@@ -44,6 +45,7 @@ public class BananaGameManager : NetworkBehaviour
     public override void Spawned()
     {
         Instance = this;
+        LiveConfig.Changed += HandleLiveConfigChanged;
         BuildMinigames();
 
         if (Object.HasStateAuthority)
@@ -52,9 +54,11 @@ public class BananaGameManager : NetworkBehaviour
             CountdownRemaining = -1f;
             OvertimeRemaining = -1f;
             WinnerScore = 0;
-            SelectedGame = ReadSessionMiniGame();
+            Config = LiveConfig.Local;
+            SelectedGame = Config.FirstEnabled(ReadSessionMiniGame());
             ApplySelectedGameToSession();
             SetSessionOpen(true);
+            _ = LiveConfig.RefreshIfStaleAsync();
         }
 
         _renderedPhase = Phase;
@@ -72,6 +76,7 @@ public class BananaGameManager : NetworkBehaviour
 
     public override void Despawned(NetworkRunner runner, bool hasState)
     {
+        LiveConfig.Changed -= HandleLiveConfigChanged;
         _active?.Cleanup();
         if (Instance == this)
         {
@@ -201,6 +206,12 @@ public class BananaGameManager : NetworkBehaviour
             return;
         }
 
+        if (enabled && !Config.SoloPracticeEnabled)
+        {
+            RPC_ShowFeedback("El modo prueba está desactivado por ahora", 2);
+            return;
+        }
+
         AllowSoloPractice = enabled;
         RPC_ShowFeedback(enabled ? "Modo prueba: podes arrancar solo" : "Modo normal: minimo 2 listos", 1);
     }
@@ -213,6 +224,12 @@ public class BananaGameManager : NetworkBehaviour
         }
 
         MiniGameId next = MiniGameNames.Clamp((int)id);
+        if (Config.IsDisabled(next))
+        {
+            RPC_ShowFeedback("Ese minijuego está desactivado por ahora", 2);
+            return;
+        }
+
         if (SelectedGame == next)
         {
             return;
@@ -316,10 +333,10 @@ public class BananaGameManager : NetworkBehaviour
     {
         return SelectedGame switch
         {
-            MiniGameId.BananaRain => candidate.Score >= BananaRushConfig.BananaTargetScore,
+            MiniGameId.BananaRain => candidate.Score >= Config.BananaTargetScore,
             MiniGameId.MemoryPuzzle => candidate.Score >= MemoryPuzzleMinigame.PairCount,
-            MiniGameId.TreeChop => candidate.Score >= 30,
-            MiniGameId.ChestBeat => candidate.Score >= 50,
+            MiniGameId.TreeChop => candidate.Score >= Config.TreeChopTarget,
+            MiniGameId.ChestBeat => candidate.Score >= Config.ChestTarget,
             _ => false,
         };
     }
@@ -361,6 +378,35 @@ public class BananaGameManager : NetworkBehaviour
         ResultsBoard = default;
         SetSessionOpen(true);
         ResetPlayersForLobby();
+        PublishLiveConfig();
+        _ = LiveConfig.RefreshIfStaleAsync();
+    }
+
+    private void HandleLiveConfigChanged()
+    {
+        if (Object != null && Object.IsValid && Object.HasStateAuthority && Phase == MatchPhase.Lobby)
+        {
+            PublishLiveConfig();
+        }
+    }
+
+    // Solo en el lobby: durante la cuenta atras y la partida las reglas quedan congeladas.
+    private void PublishLiveConfig()
+    {
+        Config = LiveConfig.Local;
+
+        if (Config.IsDisabled(SelectedGame))
+        {
+            SelectedGame = Config.FirstEnabled(SelectedGame);
+            ApplySelectedGameToSession();
+            UnreadyEveryone();
+            RPC_ShowFeedback($"Se desactivó ese minijuego: ahora {MiniGameNames.Display(SelectedGame)}", 1);
+        }
+
+        if (!Config.SoloPracticeEnabled && AllowSoloPractice)
+        {
+            AllowSoloPractice = false;
+        }
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
@@ -394,7 +440,7 @@ public class BananaGameManager : NetworkBehaviour
         }
 
         Phase = MatchPhase.Countdown;
-        CountdownRemaining = _countdownDuration;
+        CountdownRemaining = Config.CountdownSeconds;
         SetSessionOpen(false);
         RPC_ShowFeedback("Todos listos. Arranca el conteo...", 1);
     }
@@ -538,7 +584,7 @@ public class BananaGameManager : NetworkBehaviour
 
         for (int i = 0; i < ranked.Count; i++)
         {
-            int cup = Mathf.Clamp(4 - i, 1, 4);
+            int cup = Mathf.Clamp(4 - i, 1, 4) * Config.CupMultiplier;
             ranked[i].RPC_AddCupScore(cup);
         }
     }

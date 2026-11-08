@@ -124,7 +124,14 @@ public class ChatController : MonoBehaviour
         }
         else if (EnterPressed() && CanChat())
         {
-            SetTyping(true);
+            if (LiveConfig.Match.ChatEnabled)
+            {
+                SetTyping(true);
+            }
+            else
+            {
+                GameFeedback.Toast("El chat está desactivado por ahora", new Color(1f, 0.68f, 0.42f));
+            }
         }
 
         if (_logDirty)
@@ -318,6 +325,7 @@ public class ChatController : MonoBehaviour
 
         _panelGroup.alpha = alpha;
         _background.color = new Color(0.02f, 0.06f, 0.04f, _typing ? 0.72f : 0.4f);
+        _hint.text = LiveConfig.Match.ChatEnabled ? HintText : "Chat desactivado";
 
         if (_typing)
         {

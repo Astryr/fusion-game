@@ -17,6 +17,12 @@ public class MainMenuController : MonoBehaviour
     private Button _joinTypedButton;
     private Button _refreshButton;
     private RectTransform _sessionListContent;
+    private RankingPanel _rankingPanel;
+    private Text _cloudStatusText;
+    private GameObject _motdBox;
+    private Text _motdText;
+    private Text _configText;
+    private bool _busy;
     private readonly List<GameObject> _sessionRows = new List<GameObject>();
 
     private void Awake()
@@ -32,6 +38,17 @@ public class MainMenuController : MonoBehaviour
 
     private async void Start()
     {
+        LiveConfig.LoadCached();
+        _ = LiveConfig.RefreshAsync();
+        RefreshLiveUi();
+
+        string savedNickname = PlayerPrefs.GetString(CloudConfig.NicknamePref, string.Empty);
+        if (!string.IsNullOrWhiteSpace(savedNickname))
+        {
+            CloudServices.UseIdentity(savedNickname);
+            _ = RankingService.SyncAsync();
+        }
+
         var handler = NetworkRunnerHandler.Instance;
         if (handler != null)
         {
@@ -58,6 +75,9 @@ public class MainMenuController : MonoBehaviour
             handler.OnConnectionFailedEvent += HandleConnectionFailed;
             handler.OnSessionListUpdatedEvent += HandleSessionList;
         }
+
+        CloudServices.StatusChanged += HandleCloudStatus;
+        LiveConfig.Changed += RefreshLiveUi;
     }
 
     private void OnDisable()
@@ -68,6 +88,9 @@ public class MainMenuController : MonoBehaviour
             handler.OnConnectionFailedEvent -= HandleConnectionFailed;
             handler.OnSessionListUpdatedEvent -= HandleSessionList;
         }
+
+        CloudServices.StatusChanged -= HandleCloudStatus;
+        LiveConfig.Changed -= RefreshLiveUi;
     }
 
     private void BuildUI()
@@ -76,6 +99,7 @@ public class MainMenuController : MonoBehaviour
         BuildTitle(canvas.transform);
         BuildCreatePanel(canvas.transform);
         BuildBrowserPanel(canvas.transform);
+        BuildRankingEntry(canvas.transform);
 
         _statusText = UIFactory.CreateText(canvas.transform, string.Empty, 20, TextAnchor.MiddleCenter, new Color(1f, 0.65f, 0.65f));
         _statusText.fontStyle = FontStyle.Bold;
@@ -93,8 +117,117 @@ public class MainMenuController : MonoBehaviour
         creditsShadow.effectDistance = new Vector2(1f, -1f);
         UIFactory.SetRect(credits.rectTransform, Vector2.zero, new Vector2(1f, 0f), new Vector2(20f, 6f), new Vector2(-20f, 28f));
 
+        BuildLiveInfo(canvas.transform);
+        _rankingPanel = RankingPanel.Create(canvas.transform);
+
         RefreshHint();
         ShowRooms(new List<RoomRow>());
+        RefreshLiveUi();
+    }
+
+    private void BuildLiveInfo(Transform parent)
+    {
+        var anchor = new Vector2(0.5f, 1f);
+        Image box = UIStyle.CreateImage(parent, "MotdBox", new Color(0.05f, 0.12f, 0.08f, 0.88f), 12);
+        box.raycastTarget = false;
+        _motdBox = box.gameObject;
+        UIFactory.SetRect(box.rectTransform, anchor, anchor, new Vector2(446f, -200f), new Vector2(630f, -118f));
+
+        _motdText = UIStyle.CreateLabel(box.transform, string.Empty, 13, Color.white, TextAnchor.MiddleLeft);
+        _motdText.supportRichText = true;
+        _motdText.verticalOverflow = VerticalWrapMode.Truncate;
+        UIFactory.SetRect(_motdText.rectTransform, Vector2.zero, Vector2.one, new Vector2(10f, 4f), new Vector2(-10f, -4f));
+
+        _configText = UIStyle.CreateLabel(parent, string.Empty, 12, new Color(1f, 1f, 1f, 0.85f), TextAnchor.LowerLeft, true);
+        _configText.horizontalOverflow = HorizontalWrapMode.Overflow;
+        var outline = _configText.gameObject.AddComponent<Outline>();
+        outline.effectColor = new Color(0.05f, 0.09f, 0.04f, 0.95f);
+        outline.effectDistance = new Vector2(1f, -1f);
+        UIFactory.SetRect(_configText.rectTransform, Vector2.zero, Vector2.zero, new Vector2(14f, 30f), new Vector2(520f, 50f));
+    }
+
+    private void RefreshLiveUi()
+    {
+        if (_configText == null)
+        {
+            return;
+        }
+
+        _configText.text = LiveConfig.StatusLine;
+
+        bool hasMotd = !string.IsNullOrEmpty(LiveConfig.Motd);
+        _motdBox.SetActive(hasMotd);
+        if (hasMotd)
+        {
+            _motdText.text = $"<b><color=#FFD138>NOVEDAD</color></b>\n{UIStyle.Escape(LiveConfig.Motd)}";
+        }
+
+        for (int i = 0; i < _miniGameDropdown.options.Count && i < MiniGameNames.DisplayNames.Length; i++)
+        {
+            bool disabled = LiveConfig.Local.IsDisabled((MiniGameId)i);
+            _miniGameDropdown.options[i].text = disabled ? MiniGameNames.DisplayNames[i] + " (no disponible)" : MiniGameNames.DisplayNames[i];
+        }
+
+        _miniGameDropdown.RefreshShownValue();
+        RefreshHint();
+
+        if (!LiveConfig.IsVersionSupported)
+        {
+            ShowStatus($"Hay una versión nueva del juego (mínima {LiveConfig.MinVersion}, la tuya es {Application.version}). Actualizalo para jugar.",
+                new Color(1f, 0.55f, 0.5f));
+        }
+
+        ApplyButtonState();
+    }
+
+    private void BuildRankingEntry(Transform parent)
+    {
+        var anchor = new Vector2(0.5f, 1f);
+        Button button = UIStyle.CreateButton(parent, "RANKING", UIStyle.Warn, 26, 12, 5f);
+        UIFactory.SetRect(button.GetComponent<RectTransform>(), anchor, anchor, new Vector2(470f, -78f), new Vector2(630f, -26f));
+        button.onClick.AddListener(OpenRanking);
+
+        _cloudStatusText = UIStyle.CreateLabel(parent, string.Empty, 13, UIStyle.Muted, TextAnchor.UpperRight, true);
+        _cloudStatusText.horizontalOverflow = HorizontalWrapMode.Overflow;
+        var outline = _cloudStatusText.gameObject.AddComponent<Outline>();
+        outline.effectColor = new Color(0.05f, 0.09f, 0.04f, 0.95f);
+        outline.effectDistance = new Vector2(1.2f, -1.2f);
+        UIFactory.SetRect(_cloudStatusText.rectTransform, anchor, anchor, new Vector2(380f, -106f), new Vector2(630f, -82f));
+        RefreshCloudStatus();
+    }
+
+    public void OpenRanking()
+    {
+        string typed = _nicknameInput != null ? _nicknameInput.text : string.Empty;
+        CloudServices.UseIdentity(string.IsNullOrWhiteSpace(typed) ? PlayerPrefs.GetString(CloudConfig.NicknamePref, string.Empty) : typed);
+        _rankingPanel.Open();
+    }
+
+    private void HandleCloudStatus(CloudStatus status)
+    {
+        RefreshCloudStatus();
+    }
+
+    private void RefreshCloudStatus()
+    {
+        if (_cloudStatusText == null)
+        {
+            return;
+        }
+
+        _cloudStatusText.text = CloudServices.StatusLabel;
+        switch (CloudServices.Status)
+        {
+            case CloudStatus.Online:
+                _cloudStatusText.color = new Color(0.62f, 1f, 0.55f);
+                break;
+            case CloudStatus.Offline:
+                _cloudStatusText.color = new Color(1f, 0.68f, 0.42f);
+                break;
+            default:
+                _cloudStatusText.color = UIStyle.Muted;
+                break;
+        }
     }
 
     private void BuildTitle(Transform parent)
@@ -135,6 +268,7 @@ public class MainMenuController : MonoBehaviour
         AddFieldLabel(content, "TU NOMBRE", -64f);
         _nicknameInput = UIStyle.CreateInputField(content, "ej: Tomi");
         _nicknameInput.characterLimit = 14;
+        _nicknameInput.text = PlayerPrefs.GetString(CloudConfig.NicknamePref, string.Empty);
         UIFactory.SetRect(_nicknameInput.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(1, 1), new Vector2(22, -122), new Vector2(-22, -84));
 
         AddFieldLabel(content, "NOMBRE DE LA SALA", -130f);
@@ -239,11 +373,18 @@ public class MainMenuController : MonoBehaviour
             return;
         }
 
+        MiniGameId chosen = MiniGameNames.Clamp(_miniGameDropdown.value);
+        if (LiveConfig.Local.IsDisabled(chosen))
+        {
+            ShowStatus("Ese minijuego está desactivado por ahora. Elegí otro.", new Color(1f, 0.55f, 0.5f));
+            return;
+        }
+
         SetBusy(true, "Creando sala...");
         bool success = await handler.CreateSessionAsync(
             _sessionNameInput.text,
             _nicknameInput.text,
-            MiniGameNames.Clamp(_miniGameDropdown.value));
+            chosen);
 
         if (!success)
         {
@@ -423,11 +564,18 @@ public class MainMenuController : MonoBehaviour
         return button.gameObject;
     }
 
+    private void ApplyButtonState()
+    {
+        bool canPlay = !_busy && LiveConfig.IsVersionSupported;
+        _createButton.interactable = canPlay;
+        _joinTypedButton.interactable = canPlay;
+        _refreshButton.interactable = !_busy;
+    }
+
     private void SetBusy(bool busy, string message)
     {
-        _createButton.interactable = !busy;
-        _joinTypedButton.interactable = !busy;
-        _refreshButton.interactable = !busy;
+        _busy = busy;
+        ApplyButtonState();
         if (!string.IsNullOrEmpty(message))
         {
             ShowStatus(message, new Color(0.85f, 0.92f, 1f));

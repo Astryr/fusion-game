@@ -47,7 +47,8 @@ public class BananaRainMinigame : MonoBehaviour, IMiniGame
             return;
         }
 
-        if (_director.MatchTime >= BananaRushConfig.BananaRegularDuration && _director.OvertimeRemaining < 0f)
+        MatchConfig rules = LiveConfig.Match;
+        if (_director.MatchTime >= rules.BananaTimeLimit && _director.OvertimeRemaining < 0f)
         {
             _director.OvertimeRemaining = BananaRushConfig.BananaOvertimeDuration;
             if (!_overtimeAnnounced)
@@ -69,14 +70,14 @@ public class BananaRainMinigame : MonoBehaviour, IMiniGame
 
         foreach (var player in _director.GetPlayers())
         {
-            if (player.Score >= BananaRushConfig.BananaTargetScore)
+            if (player.Score >= rules.BananaTargetScore)
             {
-                _director.DeclareWinner(player, "100 puntos");
+                _director.DeclareWinner(player, $"{rules.BananaTargetScore} puntos");
                 return;
             }
         }
 
-        float pressure = Mathf.Clamp01(_director.MatchTime / BananaRushConfig.BananaRegularDuration);
+        float pressure = Mathf.Clamp01(_director.MatchTime / rules.BananaTimeLimit);
         float minInterval = Mathf.Lerp(_minSpawnInterval, 0.22f, pressure);
         float maxInterval = Mathf.Lerp(_maxSpawnInterval, 0.4f, pressure);
 
@@ -94,19 +95,19 @@ public class BananaRainMinigame : MonoBehaviour, IMiniGame
 
         for (int i = 0; i < burst; i++)
         {
-            SpawnBanana(pressure);
+            SpawnBanana(pressure, rules);
         }
 
-        _spawnTimer = Random.Range(minInterval, maxInterval);
+        _spawnTimer = Random.Range(minInterval, maxInterval) * rules.BananaSpawnIntervalScale;
     }
 
     public void OnMatchEnded() { }
 
     public void Cleanup() { }
 
-    private void SpawnBanana(float pressure)
+    private void SpawnBanana(float pressure, MatchConfig rules)
     {
-        bool green = Random.value < BananaRushConfig.BananaGreenChance;
+        bool green = Random.value < rules.BananaGreenChance;
         bool explosive = !green && Random.value < _explosiveChance;
         NetworkObject prefab = explosive ? _explosivePrefab : _bananaPrefab;
         if (prefab == null)
@@ -117,10 +118,10 @@ public class BananaRainMinigame : MonoBehaviour, IMiniGame
         float minFall = Mathf.Lerp(_minFallSpeed, 5.2f, pressure);
         float maxFall = Mathf.Lerp(_maxFallSpeed, 7.2f, pressure);
         float fallSpeed = Random.Range(minFall, maxFall);
-        int points = explosive ? BananaRushConfig.BananaExplosivePoints : BananaRushConfig.BananaNormalPoints;
+        int points = explosive ? rules.BananaExplosivePoints : rules.BananaNormalPoints;
         if (green)
         {
-            points = BananaRushConfig.BananaGreenPoints;
+            points = rules.BananaGreenPoints;
             fallSpeed *= 0.72f;
         }
 

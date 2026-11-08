@@ -21,6 +21,8 @@ public sealed class LobbyData
     public string Hint = string.Empty;
     public bool IsMaster;
     public bool SoloOn;
+    public bool SoloAvailable = true;
+    public int DisabledMask;
     public bool LocalReady;
     public string StatusMain = string.Empty;
     public string StatusSub = string.Empty;
@@ -79,6 +81,7 @@ public class LobbyScreen : MonoBehaviour
     private Sprite _portraitSprite;
     private string _cupHex;
     private bool _built;
+    private int _shownDisabledMask = -1;
 
     public static LobbyScreen Create(Transform parent)
     {
@@ -137,7 +140,19 @@ public class LobbyScreen : MonoBehaviour
             _gameDropdown.RefreshShownValue();
         }
 
-        _soloButton.gameObject.SetActive(data.IsMaster);
+        if (data.DisabledMask != _shownDisabledMask)
+        {
+            _shownDisabledMask = data.DisabledMask;
+            for (int i = 0; i < _gameDropdown.options.Count && i < MiniGameNames.DisplayNames.Length; i++)
+            {
+                bool disabled = (data.DisabledMask & (1 << i)) != 0;
+                _gameDropdown.options[i].text = disabled ? MiniGameNames.DisplayNames[i] + " (no disponible)" : MiniGameNames.DisplayNames[i];
+            }
+
+            _gameDropdown.RefreshShownValue();
+        }
+
+        _soloButton.gameObject.SetActive(data.IsMaster && (data.SoloAvailable || data.SoloOn));
         if (data.IsMaster)
         {
             UIStyle.SetButtonLabel(_soloButton, data.SoloOn ? "SOLO: ON" : "PROBAR SOLO");

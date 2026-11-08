@@ -48,6 +48,10 @@ ExportedObj/
 sysinfo.txt
 crashlytics-build.properties
 
+# Unity regenera estos .meta en cada apertura (los assets ya estan ignorados)
+/[Aa]ssets/**/*.pdb.meta
+/[Aa]ssets/**/*.unitypackage.meta
+
 # Addressables empaquetados
 /[Aa]ssets/[Aa]ddressableAssetsData/*/*.bin*
 

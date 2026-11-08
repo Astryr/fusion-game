@@ -206,11 +206,26 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
             return false;
         }
 
+        if (!LiveConfig.IsVersionSupported)
+        {
+            OnConnectionFailedEvent?.Invoke($"Hay una versión nueva del juego (mínima {LiveConfig.MinVersion}). Actualizala para jugar.");
+            return false;
+        }
+
         await StopBrowsingAsync();
 
         sessionName = string.IsNullOrWhiteSpace(sessionName) ? _defaultSessionName : sessionName.Trim();
         LocalNickname = string.IsNullOrWhiteSpace(nickname) ? _defaultNickname : nickname.Trim();
         PendingMiniGame = miniGame;
+
+        if (!string.IsNullOrWhiteSpace(nickname))
+        {
+            PlayerPrefs.SetString(CloudConfig.NicknamePref, LocalNickname);
+            PlayerPrefs.Save();
+        }
+
+        CloudServices.UseIdentity(LocalNickname);
+        _ = RankingService.SyncAsync();
 
         OnConnectingEvent?.Invoke();
 
@@ -357,6 +372,7 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
             ? BananaGameManager.Instance.FeedbackRpcCount
             : 0;
         stats += $"\nRPC de feedback recibidos: {feedbackRpcCount}";
+        stats += $"\nConfig: {LiveConfig.SourceLabel} r{LiveConfig.Local.Revision}{HostConfigNote()}";
         if (_networkDiagnosticsStyle == null)
         {
             _networkDiagnosticsStyle = new GUIStyle(GUI.skin.label)
@@ -369,12 +385,26 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
             };
         }
 
-        Rect panel = new Rect(12f, 12f, 430f, 102f);
+        Rect panel = new Rect(12f, 12f, 520f, 128f);
         Color previousColor = GUI.color;
         GUI.color = new Color(0.035f, 0.055f, 0.075f, 0.96f);
         GUI.Box(panel, GUIContent.none);
         GUI.color = previousColor;
-        GUI.Label(new Rect(24f, 18f, 406f, 90f), $"RED - DIAGNOSTICO (F3)\n{stats}", _networkDiagnosticsStyle);
+        GUI.Label(new Rect(24f, 18f, 496f, 116f), $"RED - DIAGNOSTICO (F3)\n{stats}", _networkDiagnosticsStyle);
+    }
+
+    private static string HostConfigNote()
+    {
+        BananaGameManager manager = BananaGameManager.Instance;
+        if (manager == null || manager.Object == null || !manager.Object.IsValid || !manager.Config.Valid)
+        {
+            return string.Empty;
+        }
+
+        MatchConfig shared = manager.Config;
+        return shared.ComputeHash() == LiveConfig.Local.ComputeHash()
+            ? " · igual a la del host"
+            : $" · distinta: se usa la del host (r{shared.Revision})";
     }
 #endif
 

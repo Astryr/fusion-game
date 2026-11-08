@@ -319,6 +319,54 @@ instalado en tu propia máquina:
 > pisarse cambios. Hacer `git pull origin main` seguido (sobre todo antes de
 > empezar a laburar) ayuda a evitar sorpresas.
 
+---
+
+## F. Ranking online (Unity Gaming Services)
+
+El proyecto ya viene vinculado a Unity Cloud (proyecto **Banana Rush**), así
+que para jugar **no hace falta configurar nada**: clonás, abrís el proyecto y
+el ranking funciona. Hace falta internet; sin internet el juego anda igual y
+guarda los puntos para mandarlos después.
+
+Si necesitás tocar la configuración en la nube:
+
+1. Pedí que te inviten a la organización en <https://cloud.unity.com>.
+2. En el proyecto **Banana Rush**, entorno `production`, abrí
+   **Development > Products > Leaderboards**. El ranking tiene que existir
+   con estos valores:
+   - ID: `copa_banana`
+   - Sort Order: Highest to lowest
+   - Update Strategy: Total score
+3. Antes de una demo, **reseteá** el ranking (Leaderboards > `copa_banana` >
+   Reset) para borrar los puntajes de prueba.
+
+Para probar con dos instancias en la misma PC usá **apodos distintos**: cada
+apodo es un jugador distinto en el ranking (con el mismo apodo son el mismo).
+
+---
+
+## G. Remote Config (Live Ops)
+
+El balance y los flags del juego viven en `Assets/LiveOps/BananaRush.rc`. Para
+jugar no hace falta hacer nada (si el servicio no responde se usan los valores
+originales), pero para **publicar** la config en Unity Cloud:
+
+1. Abrí el proyecto en Unity y esperá a que termine de importar (instala solos
+   los paquetes `Remote Config` y `Deployment`).
+2. Abrí **Services > Deployment**. Tiene que aparecer `BananaRush.rc`.
+3. Marcá `BananaRush.rc` y tocá **Deploy Selected**. El estado tiene que pasar a
+   *Deployed*. El destino es el entorno `production` del proyecto vinculado.
+4. En <https://cloud.unity.com> (proyecto **Banana Rush** > **Development >
+   Products > Remote Config > Config**, entorno `production`) tienen que verse las
+   21 claves. Si la pantalla marca cambios pendientes, tocá **Publish**.
+5. Probalo: el menú muestra abajo a la izquierda `config remota r1 · 21 claves` y
+   el cartel NOVEDAD con el mensaje del día.
+
+Para cambiar un valor: editá el `.rc` (o la clave en el dashboard), subí
+`config_revision` y volvé a desplegar. Los jugadores lo toman al abrir el juego o
+cuando su sala vuelve al lobby. La lista de claves, tipos y rangos está en el
+`README.md`.
+
 ## Temario cubierto
 
 - **JR6**: propiedades `[Networked]` (fase, puntaje, ready, stun) e

@@ -15,7 +15,6 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
     private const float RockVisualHeight = 1.25f;
     private const float RockImpactY = PlatformTopY + RockVisualHeight * 0.5f;
     private const float DeathY = -8f;
-    private const float MatchDuration = 95f;
 
     private BananaGameManager _director;
     private Sprite _logSprite;
@@ -138,7 +137,7 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
         {
             _director.DeclareWinner(last, "ultimo en el tronco");
         }
-        else if (!soloRun && _director.MatchTime >= MatchDuration)
+        else if (!soloRun && _director.MatchTime >= LiveConfig.Match.LogMatchSeconds)
         {
             _director.DeclareWinner(ClosestToCenter() ?? last, "aguanto mas");
         }

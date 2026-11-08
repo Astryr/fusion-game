@@ -28,6 +28,7 @@ public class GameHUDController : MonoBehaviour
 
     private GameObject _endScreen;
     private Text _endScreenText;
+    private Text _rankingText;
     private Button _backToLobbyButton;
     private float _endScreenShownAt = -1f;
 
@@ -61,7 +62,9 @@ public class GameHUDController : MonoBehaviour
 
         GameFeedback.ToastRaised += HandleToast;
         GameFeedback.WorldPopupRaised += HandleWorldPopup;
+        RankingService.SubmissionChanged += HandleSubmission;
         _subscribedFeedback = true;
+        HandleSubmission(RankingService.LastSubmission);
     }
 
     private void OnDisable()
@@ -77,6 +80,7 @@ public class GameHUDController : MonoBehaviour
         {
             GameFeedback.ToastRaised -= HandleToast;
             GameFeedback.WorldPopupRaised -= HandleWorldPopup;
+            RankingService.SubmissionChanged -= HandleSubmission;
         }
     }
 
@@ -251,6 +255,12 @@ public class GameHUDController : MonoBehaviour
         _endScreenText.raycastTarget = false;
         UIFactory.SetRect(_endScreenText.rectTransform, new Vector2(0, 0.3f), new Vector2(1, 0.68f), new Vector2(40, 0), new Vector2(-40, 0));
 
+        _rankingText = UIFactory.CreateText(_endScreen.transform, string.Empty, 22, TextAnchor.MiddleCenter, Color.white);
+        _rankingText.fontStyle = FontStyle.Bold;
+        _rankingText.raycastTarget = false;
+        _rankingText.supportRichText = false;
+        UIFactory.SetRect(_rankingText.rectTransform, new Vector2(0, 0.21f), new Vector2(1, 0.29f), new Vector2(40, 0), new Vector2(-40, 0));
+
         _backToLobbyButton = UIStyle.CreateButton(_endScreen.transform, "VOLVER AL LOBBY", UIStyle.Info, 28, 14, 5f);
         UIFactory.SetRect(_backToLobbyButton.GetComponent<RectTransform>(),
             new Vector2(0.5f, 0.14f), new Vector2(0.5f, 0.14f), new Vector2(-170, -27), new Vector2(170, 27));
@@ -293,6 +303,8 @@ public class GameHUDController : MonoBehaviour
         data.Hint = MiniGameNames.Hint(manager.SelectedGame);
         data.IsMaster = manager.Object != null && manager.Object.HasStateAuthority;
         data.SoloOn = manager.AllowSoloPractice;
+        data.SoloAvailable = manager.Config.SoloPracticeEnabled;
+        data.DisabledMask = manager.Config.DisabledMinigames;
         data.LocalReady = local != null && local.IsReady;
 
         int readyCount = 0;
@@ -572,10 +584,14 @@ public class GameHUDController : MonoBehaviour
         var manager = BananaGameManager.Instance;
         int current = manager != null ? (int)manager.SelectedGame : 0;
         int count = MiniGameNames.DisplayNames.Length;
-        int next = (current + direction) % count;
-        if (next < 0)
+        int next = current;
+        for (int step = 0; step < count; step++)
         {
-            next += count;
+            next = ((next + direction) % count + count) % count;
+            if (manager == null || !manager.Config.IsDisabled(MiniGameNames.Clamp(next)))
+            {
+                break;
+            }
         }
 
         RequestLobbyGame(MiniGameNames.Clamp(next));
@@ -586,6 +602,12 @@ public class GameHUDController : MonoBehaviour
         var manager = BananaGameManager.Instance;
         if (manager == null || manager.Phase != MatchPhase.Lobby)
         {
+            return;
+        }
+
+        if (manager.Config.IsDisabled(id))
+        {
+            GameFeedback.Toast("Ese minijuego está desactivado por ahora", new Color(1f, 0.45f, 0.4f));
             return;
         }
 
@@ -623,6 +645,32 @@ public class GameHUDController : MonoBehaviour
     private static void HandleWorldPopup(Vector3 position, string message, Color color)
     {
         WorldPopup.Spawn(position, message, color);
+    }
+
+    private void HandleSubmission(SubmissionInfo info)
+    {
+        if (_rankingText == null)
+        {
+            return;
+        }
+
+        switch (info.State)
+        {
+            case SubmissionState.Sent:
+                _rankingText.color = new Color(0.62f, 1f, 0.55f);
+                break;
+            case SubmissionState.Queued:
+                _rankingText.color = new Color(1f, 0.68f, 0.42f);
+                break;
+            case SubmissionState.Skipped:
+                _rankingText.color = UIStyle.Muted;
+                break;
+            default:
+                _rankingText.color = new Color(1f, 0.92f, 0.55f);
+                break;
+        }
+
+        _rankingText.text = info.State == SubmissionState.None ? string.Empty : $"RANKING GLOBAL: {info.Detail}";
     }
 
     private void HandlePlayerCountChanged(int count)

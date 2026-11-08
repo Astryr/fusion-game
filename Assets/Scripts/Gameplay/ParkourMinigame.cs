@@ -76,7 +76,7 @@ public class ParkourMinigame : MonoBehaviour, IMiniGame
         {
             if (_director.MatchTime > 2f)
             {
-                _director.AvalancheX += BananaRushConfig.ParkourAvalancheSpeed * deltaTime;
+                _director.AvalancheX += LiveConfig.Match.ParkourAvalancheSpeed * deltaTime;
             }
 
             int finished = 0;

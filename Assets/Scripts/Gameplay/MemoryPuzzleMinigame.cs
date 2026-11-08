@@ -9,7 +9,7 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
     public const int Rows = 3;
     public const int CellCount = Columns * Rows;
     public const int PairCount = CellCount / 2;
-    public const float PeekSeconds = 7f;
+    public static float PeekSeconds => LiveConfig.Match.MemotestPeekSeconds;
     public const float MismatchSeconds = 0.85f;
 
     private BananaGameManager _director;
