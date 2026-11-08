@@ -41,7 +41,6 @@ public static class MiniGameNames
         return index >= 0 && index < DisplayNames.Length ? DisplayNames[index] : id.ToString();
     }
 
-    // Los minijuegos con puntajes configurables arman la ayuda con las reglas vigentes.
     public static string Hint(MiniGameId id)
     {
         MatchConfig rules = LiveConfig.Match;

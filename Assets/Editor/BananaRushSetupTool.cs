@@ -168,7 +168,6 @@ public static class BananaRushSetupTool
 
         ApplySpriteRects(importer, path, rects, new Vector2(0.5f, 0.5f));
 
-        // Fila de arriba (mas pasto) y la pieza mas centrada de esa fila.
         int topY = islands.Max(i => i.y);
         float centerX = texture.width / 2f;
         int grassIndex = MostCenteredInRow(islands, topY, centerX);
@@ -337,7 +336,6 @@ public static class BananaRushSetupTool
         AnimationClip idleClip = CreateSpriteClip($"{AnimationsDir}/Moniko_Idle.anim", new[] { idleSprite }, 4f, true);
         AnimationClip walkClip = CreateSpriteClip($"{AnimationsDir}/Moniko_Walk.anim", walkFrames, 10f, true);
 
-        // Salto: solo poses de vuelo y sin loop (el sheet incluye piso/aterrizaje).
         Sprite[] airborneJump = PickAirborneJumpFrames(jumpFrames);
         AnimationClip jumpClip = CreateSpriteClip($"{AnimationsDir}/Moniko_Jump.anim", airborneJump, 12f, false);
 
@@ -679,7 +677,6 @@ public static class BananaRushSetupTool
         groundGO.layer = LayerMask.NameToLayer("Ground");
         groundGO.transform.position = Vector3.zero;
 
-        // Setup viejo: SpriteRenderer en Ground; ahora dibujan los hijos.
         var obsoleteRenderer = groundGO.GetComponent<SpriteRenderer>();
         if (obsoleteRenderer != null)
         {

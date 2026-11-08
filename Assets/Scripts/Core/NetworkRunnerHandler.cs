@@ -13,20 +13,10 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
 {
     public static NetworkRunnerHandler Instance { get; private set; }
 
-    [Header("Configuracion")]
-    [Tooltip("Nombre del prefab del jugador, ubicado dentro de una carpeta Resources.")]
     [SerializeField] private string _playerPrefabResourcePath = "Player";
-
-    [Tooltip("Nombre del prefab del director de partida (bananas + victoria), en una carpeta Resources.")]
     [SerializeField] private string _gameManagerPrefabResourcePath = "BananaGameManager";
-
-    [Tooltip("Build Index de la escena de juego (debe estar registrada en Build Settings).")]
     [SerializeField] private int _gameSceneBuildIndex = 1;
-
-    [Tooltip("Sesion por defecto si el campo de texto del menu queda vacio.")]
     [SerializeField] private string _defaultSessionName = "SalaPrincipal";
-
-    [Tooltip("Nombre de jugador por defecto si el campo de texto del menu queda vacio.")]
     [SerializeField] private string _defaultNickname = "Jugador";
 
     public NetworkRunner Runner { get; private set; }
@@ -343,8 +333,6 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         _trafficLine = TrafficWaiting;
     }
 
-    // Fusion deja las estadisticas de cada ciclo de actualizacion en un snapshot; se suman y se pasan a "por segundo".
-    // Solo hay datos con la DLL de Fusion en modo Debug.
     private void SampleTraffic()
     {
         if (_trafficUnavailable || !Runner.TryGetFusionStatistics(out FusionStatisticsManager manager) || manager == null)
@@ -553,7 +541,6 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
             return;
         }
 
-        // Shared Mode: cada cliente spawnea su propio Player.
         if (player == runner.LocalPlayer && !_spawnedPlayers.ContainsKey(player))
         {
             if (_playerPrefab != null)
@@ -615,7 +602,6 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
             if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) horizontal += 1f;
         }
 
-        // Solo Space; el buffer se consume aca.
         var buttons = default(NetworkButtons);
         buttons.Set(InputButton.Jump, _jumpQueued && !typing);
         buttons.Set(InputButton.Action, _actionQueued && !typing);

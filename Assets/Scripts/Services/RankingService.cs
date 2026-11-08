@@ -57,11 +57,8 @@ public sealed class RankingResult
     public int PendingPoints;
 }
 
-// El ranking global suma los puntos de Copa de cada partida (leaderboard con estrategia "Total score").
-// Los puntos se anotan primero en el equipo y se envian despues: sin internet quedan pendientes y se reintentan solos.
 public static class RankingService
 {
-    // Mutable solo para pruebas: apuntarlo a un ranking inexistente fuerza el camino de cola offline.
     public static string LeaderboardId = CloudConfig.LeaderboardId;
 
     public static SubmissionInfo LastSubmission { get; private set; }
@@ -81,8 +78,6 @@ public static class RankingService
 
     public static int PendingPoints => GetPending(CloudServices.Profile);
 
-    // Evita regalar puntos: la practica en solitario y las salas de un jugador no suman al ranking.
-    // El flag leaderboard_enabled de Remote Config lo apaga para todos (mantenimiento).
     public static void BeginMatch(int playerCount, bool soloPractice)
     {
         _matchCounts = false;
@@ -126,7 +121,6 @@ public static class RankingService
         return FlushAsync(CloudServices.Profile);
     }
 
-    // Conecta y manda lo que haya quedado pendiente de sesiones anteriores.
     public static async Task SyncAsync()
     {
         if (await CloudServices.EnsureOnlineAsync())
@@ -169,7 +163,6 @@ public static class RankingService
             catch (LeaderboardsException ex) when (ex.Reason == LeaderboardsExceptionReason.EntryNotFound ||
                                                    ex.Reason == LeaderboardsExceptionReason.NotFound)
             {
-                // Todavia no tiene puntos: es un estado normal, no un error.
             }
 
             result.Ok = true;
@@ -184,7 +177,6 @@ public static class RankingService
         return result;
     }
 
-    // El servicio devuelve "Nombre#1234" y Authentication no admite espacios (se guardan como "_").
     public static string CleanName(string raw)
     {
         if (string.IsNullOrEmpty(raw))
@@ -203,7 +195,6 @@ public static class RankingService
         return name.Length > 0 ? name : CloudConfig.DefaultNickname;
     }
 
-    // Los puntos quedan atados al perfil que los gano: si el jugador cambia de apodo se envian cuando vuelva a usarlo.
     private static async Task<bool> FlushAsync(string profile)
     {
         if (GetPending(profile) <= 0)

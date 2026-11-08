@@ -12,6 +12,5 @@ public static class CloudConfig
     public const int RankingPageSize = 10;
     public const int MinMatchPoints = 1;
 
-    // 4 puntos del primer puesto por el multiplicador de Copa maximo (cup_points_multiplier = 5).
     public const int MaxMatchPoints = 20;
 }

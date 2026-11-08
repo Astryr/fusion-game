@@ -5,10 +5,7 @@ using UnityEngine;
 [RequireComponent(typeof(CircleCollider2D))]
 public class BananaController : NetworkBehaviour
 {
-    [Tooltip("Puntos que suma (positivo) o resta (negativo) al jugador que la atrapa.")]
     [SerializeField] private int _pointValue = 5;
-
-    [Tooltip("Velocidad de caida (unidades/seg). La randomiza BananaGameManager al spawnear.")]
     [SerializeField] private float _fallSpeed = 4f;
 
     [Networked] private NetworkBool Consumed { get; set; }

@@ -6,7 +6,6 @@ public class BananaGameManager : NetworkBehaviour
 {
     public static BananaGameManager Instance { get; private set; }
 
-    // Reglas de la partida: las publica el host y todos juegan con esta copia (ver LiveConfig.Match).
     [Networked] public MatchConfig Config { get; set; }
 
     [Networked] public NetworkBool AllowSoloPractice { get; set; }
@@ -269,7 +268,6 @@ public class BananaGameManager : NetworkBehaviour
             return;
         }
 
-        // Sin ganador (todos eliminados a la vez) la ronda igual tiene que cerrarse.
         if (Object.HasStateAuthority)
         {
             FinishMatch(winner, detail);
@@ -402,7 +400,6 @@ public class BananaGameManager : NetworkBehaviour
         }
     }
 
-    // Solo en el lobby: durante la cuenta atras y la partida las reglas quedan congeladas.
     private void PublishLiveConfig()
     {
         Config = LiveConfig.Local;
@@ -577,7 +574,6 @@ public class BananaGameManager : NetworkBehaviour
         var ranked = new List<PlayerController>(GetPlayers());
         ranked.Sort((a, b) =>
         {
-            // El ganador declarado siempre se lleva el primer puesto, aunque haya empate de puntaje.
             if (a == winner || b == winner)
             {
                 return a == b ? 0 : a == winner ? -1 : 1;
@@ -728,7 +724,6 @@ public class BananaGameManager : NetworkBehaviour
             : MiniGameId.BananaRain;
     }
 
-    // Cerrada durante la partida para que nadie entre a medio minijuego.
     private void SetSessionOpen(bool open)
     {
         if (Runner == null || Runner.SessionInfo == null || !Runner.SessionInfo.IsValid)

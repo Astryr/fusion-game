@@ -13,8 +13,6 @@ public enum ConfigSource
     Remote,
 }
 
-// Configuracion remota (Unity Remote Config) con valores por defecto, validacion y cache.
-// Las claves de balance las publica el host por red (BananaGameManager.Config): en una sala todos juegan con las del host.
 public static class LiveConfig
 {
     private struct UserAttributes { }
@@ -22,7 +20,6 @@ public static class LiveConfig
 
     public const float StaleSeconds = 45f;
 
-    // Mutable solo para pruebas (simula una red lenta).
     public static float FetchTimeout = 8f;
 
     public static MatchConfig Local { get; private set; } = LocalDefaults();
@@ -34,7 +31,6 @@ public static class LiveConfig
     public static string LastError { get; private set; } = string.Empty;
     public static IReadOnlyList<string> Rejected => _rejected;
 
-    // Corta toda llamada de red (pruebas automaticas y demos sin internet).
     public static bool ForceOffline { get; set; }
 
     public static event Action Changed;
@@ -43,7 +39,6 @@ public static class LiveConfig
     private static Task _refresh;
     private static float _lastAttempt = -1000f;
 
-    // Lo que usa el gameplay: la copia del host si hay sala, la propia si no.
     public static MatchConfig Match
     {
         get
@@ -113,7 +108,6 @@ public static class LiveConfig
         }
     }
 
-    // El SDK guarda la ultima respuesta buena en disco: sirve para arrancar sin internet.
     public static void LoadCached()
     {
         if (Source != ConfigSource.Defaults)
@@ -151,7 +145,6 @@ public static class LiveConfig
         return Time.realtimeSinceStartup - _lastAttempt < StaleSeconds ? Task.CompletedTask : RefreshAsync();
     }
 
-    // Tambien lo usan las pruebas automaticas para simular lo que publica el dashboard.
     public static void ApplyJson(string json, ConfigSource source)
     {
         Apply(JObject.Parse(json), source);
@@ -248,7 +241,6 @@ public static class LiveConfig
         next.ChatEnabled = ReadBool(json, "chat_enabled", defaults.ChatEnabled, rejected);
         next.DisabledMinigames = ReadDisabledMinigames(json, rejected);
 
-        // Una banana verde que no vale mas que la comun rompe el tinte y la logica del puntaje.
         if (next.BananaGreenPoints <= next.BananaNormalPoints)
         {
             rejected.Add("banana_points_green debe ser mayor que banana_points_normal");
@@ -361,7 +353,6 @@ public static class LiveConfig
         return token.Value<string>() ?? fallback;
     }
 
-    // "ChestBeat,TreeChop": minijuegos que el host no puede elegir. "none" o vacio = ninguno.
     private static int ReadDisabledMinigames(JObject json, List<string> rejected)
     {
         string raw = ReadString(json, "disabled_minigames", string.Empty, rejected);

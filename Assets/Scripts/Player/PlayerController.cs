@@ -6,13 +6,11 @@ using UnityEngine;
 [RequireComponent(typeof(BoxCollider2D))]
 public class PlayerController : NetworkBehaviour
 {
-    [Header("Movimiento")]
     [SerializeField] private float _moveSpeed = 8f;
     [SerializeField] private float _jumpForce = 9f;
     [SerializeField] private float _gravity = 20f;
     [SerializeField] private float _maxFallSpeed = 20f;
 
-    [Header("Referencias visuales")]
     [SerializeField] private Animator _animator;
     [SerializeField] private RuntimeAnimatorController _animatorController;
 
@@ -26,7 +24,6 @@ public class PlayerController : NetworkBehaviour
     [Networked] public NetworkBool IsEliminated { get; set; }
     [Networked] public float Heat { get; set; }
 
-    // Efectos puntuales (popup, destello, sonido): la autoridad sube el contador y cada cliente lo reproduce al verlo cambiar.
     [Networked] private int FxSeq { get; set; }
     [Networked] private PlayerFx FxKind { get; set; }
     [Networked] private int FxValue { get; set; }
@@ -728,7 +725,6 @@ public class PlayerController : NetworkBehaviour
         _spriteRenderer.color = color;
     }
 
-    // Solo la autoridad de estado llama a esto.
     private void EmitFx(PlayerFx kind, int value = 0)
     {
         FxKind = kind;
@@ -802,7 +798,6 @@ public class PlayerController : NetworkBehaviour
         _flashUntil = Time.time + seconds;
     }
 
-    // Los golpes de otros jugadores pueden ser decenas por segundo; sin limite tapan todo.
     private void PlayThrottled(Sfx sfx, bool mine, float gain)
     {
         if (!mine)

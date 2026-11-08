@@ -14,7 +14,6 @@ public enum CloudStatus
     Offline,
 }
 
-// Ningun flujo del juego espera a la nube: si algo falla queda en Offline y se reintenta en el proximo uso.
 public static class CloudServices
 {
     public static CloudStatus Status { get; private set; } = CloudStatus.Idle;
@@ -22,10 +21,7 @@ public static class CloudServices
     public static string Profile { get; private set; } = "default";
     public static string FailureReason { get; private set; } = string.Empty;
 
-    // Perfil con el que esta iniciada la sesion en este momento (puede ir un paso detras de Profile).
     public static string SignedProfile => _signedProfile;
-
-    // Corta toda llamada de red (pruebas automaticas y demos sin internet).
     public static bool ForceOffline { get; set; }
 
     public static event Action<CloudStatus> StatusChanged;
@@ -47,7 +43,6 @@ public static class CloudServices
         }
     }
 
-    // Cada apodo tiene su propio perfil de Authentication: asi dos instancias en la misma PC son jugadores distintos.
     public static void UseIdentity(string nickname)
     {
         Nickname = string.IsNullOrWhiteSpace(nickname) ? CloudConfig.DefaultNickname : nickname.Trim();
@@ -73,7 +68,6 @@ public static class CloudServices
         }
     }
 
-    // Inicializa los servicios sin iniciar sesion: alcanza para Remote Config y no crea ninguna identidad.
     public static async Task InitializeAsync()
     {
         if (ForceOffline)
@@ -100,7 +94,6 @@ public static class CloudServices
         }
     }
 
-    // Inicia sesion con la identidad pedida al llamar: un UseIdentity posterior no puede cambiar a quien se loguea ni a quien se renombra.
     public static async Task<bool> EnsureOnlineAsync()
     {
         if (ForceOffline)
@@ -220,7 +213,6 @@ public static class CloudServices
         return builder.Length > 0 ? builder.ToString() : "default";
     }
 
-    // Authentication no admite espacios y le agrega un sufijo "#1234" propio.
     public static string PlayerNameFor(string nickname)
     {
         var builder = new StringBuilder();
@@ -249,7 +241,6 @@ public static class CloudServices
         return UnityServices.State == ServicesInitializationState.Initialized && AuthenticationService.Instance.IsSignedIn;
     }
 
-    // Solo cosmetico: si falla, el ranking muestra el nombre que genera el servicio.
     private static async Task SyncPlayerNameAsync(string nickname)
     {
         try

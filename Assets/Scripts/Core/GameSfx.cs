@@ -27,7 +27,6 @@ public enum Sfx
     Leave,
 }
 
-// Los efectos se sintetizan al arrancar: no dependen de archivos de audio.
 public static class GameSfx
 {
     private const string VolumePref = "br.sfx";
@@ -210,7 +209,6 @@ public static class GameSfx
         return clip;
     }
 
-    // Nota con barrido lineal de frecuencia; "squareness" la acerca a una onda cuadrada.
     private static float Note(float t, float start, float length, float freqStart, float freqEnd, float decay, float squareness = 0f)
     {
         float local = t - start;
@@ -230,7 +228,6 @@ public static class GameSfx
         return wave * attack * Mathf.Exp(-local * decay);
     }
 
-    // Ruido blanco filtrado con caida exponencial; la funcion devuelta guarda estado y se muestrea en orden.
     private static Func<float, float> NoiseBurst(int seed, float decay, float smoothing, float gain)
     {
         var rng = new System.Random(seed);

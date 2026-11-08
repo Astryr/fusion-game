@@ -1,8 +1,6 @@
 using System;
 using Fusion;
 
-// Parametros que cambian el juego. Los valores por defecto son los originales del juego:
-// si Remote Config no responde (o una clave es invalida) se juega con ellos.
 public struct MatchConfig : INetworkStruct
 {
     public const int AllMinigamesMask = (1 << 6) - 1;
@@ -78,7 +76,6 @@ public struct MatchConfig : INetworkStruct
         return preferred;
     }
 
-    // Sirve para comparar la config propia con la del host sin mandar los valores a la UI.
     public int ComputeHash()
     {
         unchecked
