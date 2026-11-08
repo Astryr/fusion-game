@@ -1,6 +1,6 @@
 # Documento de optimización y pruebas de red
 
-Banana Rush · Photon Fusion 2.1.1 · Shared Mode sobre Photon Cloud (región `sa`) · DLL Debug de Fusion · hasta 4 jugadores por sala.
+Banana Rush · Photon Fusion 2.1.3 (build 2390) · Shared Mode sobre Photon Cloud (región `sa`) · DLL Debug de Fusion · hasta 4 jugadores por sala.
 
 Todas las cifras de este documento son mediciones reales del 8/11/2026. Lo que no se pudo medir figura como pendiente, con el motivo.
 
@@ -8,8 +8,8 @@ Todas las cifras de este documento son mediciones reales del 8/11/2026. Lo que n
 
 | Tema | Resultado |
 |---|---|
-| Condiciones normales (2 clientes, Photon Cloud) | RTT 77 ms, propagación host a cliente 132 ms, RPC de ida y vuelta 214 ms, entre 0,5 y 2,2 KB/s por cliente, 0 resimulaciones |
-| Condiciones desfavorables | Pendiente de ejecución con Clumsy (sección 6) |
+| Condiciones normales (2 clientes, Photon Cloud) | RTT 77 ms, propagación host a cliente 142 ms, RPC de ida y vuelta 211 ms, entre 0,5 y 4,3 KB/s por cliente, 0 resimulaciones |
+| Condiciones desfavorables | Ejecutadas con Network Conditions de Fusion (sección 6): el perfil del proyecto sube el RTT de 77 a 159 ms y el juego sigue con un solo resultado |
 | Salida de un jugador | La partida se resuelve sola; detección inmediata si sale ordenado y a los 10 s si desaparece de golpe |
 | Salida del host | Photon reasigna el master client y el manager sigue funcionando; mismo criterio de tiempos |
 | Optimizaciones | Sección 8: 4 propiedades de red eliminadas, efectos por contador en vez de RPC, roca reconstruida, sin toast por banana |
@@ -44,42 +44,31 @@ No se implementa migración de host propia: no hace falta en Shared Mode, Photon
 
 ### 3.2 Bots de prueba
 
-Las mediciones automáticas se hicieron con dos procesos del build (host y cliente) contra Photon Cloud, controlados por un harness de bots que no forma parte del proyecto entregado. Cada bot juega partidas completas y registra tiempos con marcas UTC. Los dos procesos corren en la misma PC, así que comparten reloj. Los escenarios usados fueron: `latency`, `happy`, `rain`, `parkour`, `hostleaves`, `kill`, `latejoin`.
+Las mediciones automáticas se hicieron con dos procesos del build (host y cliente) contra Photon Cloud, controlados por un harness de bots que no forma parte del proyecto entregado. Cada bot juega partidas completas y registra tiempos con marcas UTC. Los dos procesos corren en la misma PC, así que comparten reloj. Los escenarios usados fueron: `latency`, `happy`, `rain`, `parkour`, `hostleaves`, `kill`, `latejoin` y `freeze`. Todo se volvió a medir después de pasar de Fusion 2.1.1 a 2.1.3.
 
 - **Propagación host a cliente:** el host cambia el minijuego seleccionado (`[Networked]` del manager) y anota la hora UTC; el cliente anota la hora en que ve el cambio. 6 muestras. Resolución de un frame (16,7 ms) por lado.
 - **RPC de ida y vuelta:** el cliente llama a `RPC_RequestSelectGame` (RPC hacia la State Authority) y mide hasta ver el valor reflejado en su copia del estado. 6 muestras.
 - **Bajas abruptas:** un script mata el proceso con `Stop-Process -Force`, sin cierre ordenado de la conexión.
+- **Corte de red:** el cliente bloquea su hilo principal durante 5 s y después durante 20 s. Mientras está bloqueado no envía ni recibe nada, igual que un corte total de su conexión.
 
 ## 4. Simulación de red
 
-### 4.1 Network Conditions de Fusion no sirve en Shared Mode
+Se usa Network Conditions de Fusion, en `Assets/Photon/Fusion/Resources/NetworkProjectConfig.fusion`. En la 2.1.1 no tenía efecto: con 400 ms de delay y 10% de pérdida, el RTT quedó en 77 ms, igual que sin simulación. Las notas de la 2.1.2 dicen que volvió a funcionar, y en la 2.1.3 se comprobó.
 
-La versión anterior de este documento proponía activar Network Conditions en `NetworkProjectConfig.fusion`. Se midió y no tiene efecto sobre el tráfico de juego en Shared Mode:
-
-| Medición (6 muestras cada una) | Sin simulación | Network Conditions: 400 ms de delay y 10% de pérdida |
+| Medición (6 muestras, Fusion 2.1.3) | Sin simulación | 400 ms de delay y 10% de pérdida, en los dos clientes |
 |---|---:|---:|
-| Propagación host a cliente | 132 ms | 125 ms |
-| RPC de ida y vuelta | 214 ms | 217 ms |
-| RTT promedio | 77 ms | 77 ms |
+| Propagación host a cliente | 142 ms | 351 ms |
+| RPC de ida y vuelta | 211 ms | 656 ms |
+| RTT promedio | 77 ms | 286 ms |
 
-El delay de 400 ms habría sumado más de 800 ms de RTT; no apareció. El perfil "adverso" de ese método daba números iguales a los normales, por eso se descartó.
+El asset trae el perfil adverso cargado y **apagado** (`Enabled: false`), para no degradar las partidas normales:
 
-### 4.2 Clumsy (método adoptado)
+| Perfil | Enabled | Delay min/max | Additional jitter | Loss chance min/max |
+|---|---:|---:|---:|---:|
+| Normal | false | - | - | - |
+| Adverso | true | 0,15 s / 0,15 s | 0,05 s | 0,05 / 0,05 |
 
-Se usa [Clumsy 0.3](https://github.com/jagt/clumsy/releases/tag/0.3) (basado en WinDivert), la herramienta que recomienda Photon en su guía de diagnóstico de desconexiones. Instala un driver al arrancar, así que hay que ejecutarlo como **Administrador**.
-
-Filtro, tal como lo documenta Photon, para afectar solo el tráfico de juego contra el Game Server (puertos UDP 5056 o 27002):
-
-```text
-udp.DstPort == 5056 or udp.SrcPort == 5056 or udp.DstPort == 27002 or udp.SrcPort == 27002
-```
-
-| Perfil | Configuración en Clumsy |
-|---|---|
-| Normal | Clumsy cerrado |
-| Adverso | Lag 150 ms y Drop 5%, con Inbound y Outbound tildados en ambos. Suma unos 300 ms de RTT |
-| Recuperación | Drop 100% con Inbound y Outbound durante 5 s, después Stop |
-| Corte | Drop 100% con Inbound y Outbound durante 20 s, sin parar |
+Los cortes no se hacen con pérdida configurada: con pérdida al 100% Fusion sigue entregando estado, porque reintenta lo confiable. Un corte real es dejar de enviar y de recibir, y eso es lo que hace el bloqueo del hilo (sección 6).
 
 ## 5. Resultados en condiciones normales
 
@@ -87,10 +76,10 @@ Dos clientes en la misma PC contra Photon Cloud, build de desarrollo, 60 FPS, DL
 
 | Métrica | Resultado |
 |---|---|
-| RTT promedio / mínimo / máximo | 77 ms / 63-66 ms / 100-117 ms |
-| Variación del RTT | 2,4 a 8,8 ms según la corrida |
-| Propagación host a cliente (6 muestras) | 112, 117, 150, 117, 150, 149 ms. Promedio 132 ms |
-| RPC de ida y vuelta (6 muestras) | 200, 250, 217, 217, 217, 183 ms. Promedio 214 ms |
+| RTT promedio / mínimo / máximo | 77 ms / 60-66 ms / 100-117 ms |
+| Variación del RTT | 4,0 a 8,4 ms según la corrida |
+| Propagación host a cliente (6 muestras) | 110, 155, 154, 154, 155, 121 ms. Promedio 142 ms |
+| RPC de ida y vuelta (6 muestras) | 183, 217, 233, 217, 217, 200 ms. Promedio 211 ms |
 | Paquetes | 32 por segundo entrantes, 16 por segundo salientes |
 | Resimulaciones | 0 |
 
@@ -98,26 +87,30 @@ Tráfico por escenario (promedio de toda la corrida, incluido el lobby):
 
 | Escenario | Host entra / sale | Cliente entra / sale |
 |---|---:|---:|
-| Solo lobby, 2 jugadores (`latency`) | 522 / 233 B/s | 692 / 186 B/s |
-| Lluvia de bananas hasta los 100 puntos, 53 s de partida (`rain`) | 570 / 885 B/s | 2174 / 217 B/s |
-| Tronco, 2 partidas de bananas y salida (`happy`) | 555 / 685 B/s | 1641 / 202 B/s |
+| Solo lobby, 2 jugadores (`latency`) | 521 / 233 B/s | 693 / 185 B/s |
+| Lluvia de bananas, partida completa (`rain`) | 778 / 1768 B/s | 4271 / 339 B/s |
+| Tronco, 2 partidas de bananas y salida (`happy`) | 555 / 776 B/s | 1849 / 205 B/s |
 
-El que más recibe es el cliente que no es master en la lluvia de bananas, porque el master spawnea cada banana. Aun así son unos 2 KB/s. Todo se midió con 2 jugadores; con 4 se espera que el tráfico entrante crezca con la cantidad de jugadores remotos, pero no se midió.
+El que más recibe es el cliente que no es master en la lluvia de bananas, porque el master spawnea cada banana. El pico medido es 4,3 KB/s. Todo se midió con 2 jugadores; con 4 se espera que el tráfico entrante crezca con la cantidad de jugadores remotos, pero no se midió.
 
 Comprobaciones funcionales de las mismas corridas, todas correctas: lobby y listos consistentes, premios de Copa (+4 al ganador, +3 al segundo), ganador y puntaje iguales en ambos clientes, vuelta al lobby con el jugador reseteado, y los efectos de un jugador (popups de puntos y OUT) visibles en el otro cliente.
 
 ## 6. Resultados en condiciones desfavorables
 
-**Estado: pendiente de ejecución.** Clumsy exige permisos de administrador y un driver, así que no se puede lanzar de forma automática. Procedimiento para completarla (sección 12) y tabla a llenar:
+Perfil adverso del asset (150 ms de delay, 50 ms de jitter y 5% de pérdida) activado en los dos clientes a la vez, contra Photon Cloud:
 
-| Perfil | RTT prom / mín / máx | Propagación host a cliente | RPC de ida y vuelta | Tráfico entra / sale | Resultado funcional |
+| Perfil | RTT prom / mín / máx | Propagación host a cliente | RPC de ida y vuelta | Tráfico del cliente entra / sale | Resultado funcional |
 |---|---|---|---|---|---|
-| Normal | 77 / 65 / 100 ms | 132 ms | 214 ms | 692 / 186 B/s (lobby) | Correcto |
-| Adverso (150 ms + 5%) | Pendiente | Pendiente | Pendiente | Pendiente | Pendiente |
-| Recuperación (5 s sin red) | Pendiente | - | - | - | Pendiente |
-| Corte (20 s sin red) | - | - | - | - | Pendiente |
+| Normal | 77 / 60 / 117 ms | 142 ms | 211 ms | 693 / 185 B/s (lobby) | Correcto (sección 5) |
+| Adverso | 159 / 100 / 200 ms | 213 ms (223, 198, 213, 181, 232, 232) | 369 ms (450, 367, 283, 417, 316, 383) | 710 / 187 B/s (lobby) | Parkour completo: 12 de 12 en cada cliente, mismo ganador y mismo tablero |
+| Corte de 5 s | se recupera | el estado vuelve a llegar | - | - | Los dos siguen en la sala y el cliente recibe el cambio que mandó el host |
+| Corte de 20 s | - | - | - | - | El cliente pierde la sesión. El host lo detecta a los 10,2 s |
 
-Qué se espera, por el código y la configuración: Fusion reintenta lo que no llegó, así que con 5% de pérdida no debería haber recompensas duplicadas ni dos ganadores, porque todo premio sale de la autoridad (sección 9). Con un corte de 20 s se supera `ConnectionTimeout` (10 s): el cliente debe volver al menú con el mensaje "Te desconectaste: Se perdió la conexión con Photon." y el resto de los jugadores resolver la partida como en la sección 7.
+La variación del RTT pasó de 4,0-8,4 ms en normal a 12,8-17,2 ms en adverso. No hubo resimulaciones en ninguno de los dos perfiles.
+
+En la lluvia de bananas, con el perfil adverso, el cliente que no es master no llegó a cobrar bananas: su pantalla va atrás de la posición que valida la autoridad y la banana ya pasó. Los dos clientes vieron el mismo ganador. En una conexión real a `sa` (77 ms) el mismo recorrido cobra bananas y termina la partida, así que queda como límite de juego con latencia agregada y no como una desincronización.
+
+El corte de 5 s no alcanza el `ConnectionTimeout` de 10 s, y la sala sigue. El de 20 s lo supera: la sesión del cliente termina y el host resuelve la partida como en la sección 7. El texto que muestra el menú en ese caso no quedó registrado por el bot.
 
 ## 7. Salidas y desconexiones
 
@@ -126,9 +119,9 @@ Qué se espera, por el código y la configuración: Fusion reintenta lo que no l
 | Un jugador sale en plena partida, de forma ordenada | Se despawnea su `Player`. Si queda un solo jugador y no es modo prueba, gana el que queda (detalle "el resto se desconectó"), se reparte la Copa y se vuelve al lobby con la sala reabierta | Bots, escenario `happy`: la sala queda con 1 jugador y abierta |
 | Un jugador desaparece de golpe (proceso muerto) | Igual que el caso anterior, pero Photon lo detecta al vencer `ConnectionTimeout` de 10 s | Bots, escenario `kill`: el host lo notó a los **10,1 s**, mostró resultados en el mismo instante, ganó el que quedaba y la sala se reabrió con 1 jugador |
 | El host sale de forma ordenada | Photon reasigna el master client. El manager pasa al nuevo master sin demora visible, la partida en curso se cierra con ganador el que queda y el lobby se reabre. El modo prueba sigue funcionando | Bots, escenario `hostleaves`: nuevo master y State Authority del manager de inmediato; 7 comprobaciones correctas |
-| El host desaparece de golpe | Igual, pero el nuevo master aparece al vencer el timeout | Bots, `hostleaves` con el proceso del host muerto: nuevo master a los **10,3 s**, el manager respondió de inmediato, resultados, lobby y modo prueba correctos |
+| El host desaparece de golpe | Igual, pero el nuevo master aparece al vencer el timeout | Bots, `hostleaves` con el proceso del host muerto, repetido en Fusion 2.1.3: nuevo master a los **10,2 s**, el manager respondió de inmediato, resultados, lobby y modo prueba correctos |
 | Alguien intenta entrar con la partida empezada | Se rechaza: la sala se cierra al empezar la cuenta atrás. Mensaje: "La partida ya empezó. Probá de nuevo cuando termine." | Bots, escenario `latejoin` con un tercer cliente |
-| El propio cliente pierde la conexión | Fusion cierra el runner (`ConnectionTimeout`, `PhotonCloudTimeout` u `OperationTimeout`), el juego vuelve al menú y muestra "Te desconectaste: Se perdió la conexión con Photon." | Código en `NetworkRunnerHandler.OnShutdown`. Pendiente de prueba real con el perfil Corte |
+| El propio cliente pierde la conexión | Fusion cierra el runner (`ConnectionTimeout`, `PhotonCloudTimeout` u `OperationTimeout`) y el juego vuelve al menú con "Te desconectaste: ...". | Código en `NetworkRunnerHandler.OnShutdown`. El corte de 20 s (sección 6) termina la sesión; el texto del menú no quedó en el log del bot |
 
 El timeout de 10 s sale de `Network.ConnectionTimeout` en `NetworkProjectConfig.fusion` y coincide con lo medido. Acortarlo detectaría las bajas antes pero aumentaría las desconexiones falsas con redes inestables; se deja el valor por defecto.
 
@@ -227,7 +220,7 @@ Límite de la autoridad: en Shared Mode cada jugador es State Authority de su pr
 
 **Lag Compensation: no se aplica.** No hay disparos ni ataques entre jugadores que dependan de acertar a otro en una posición pasada. Las piedras y los agujeros son peligros ambientales que calcula la autoridad. Rebobinar solo al jugador, sin rebobinar la piedra y el tronco históricos, convertiría una esquiva actual en un impacto falso. En `NetworkProjectConfig.fusion` está desactivada (`LagCompensation.Enabled: false`). Si algún día se agrega una interacción de puntería directa, hay que reevaluarlo.
 
-**Interest Management: no se aplica.** La sala admite 4 jugadores y una única arena: todos necesitan ver a los demás, las bananas y los peligros, incluso en Parkour para determinar posiciones y ganador. Con ese número de jugadores y objetos, partir la distribución espacial no reduce una carga relevante: el tráfico medido es de unos 2 KB/s.
+**Interest Management: no se aplica.** La sala admite 4 jugadores y una única arena: todos necesitan ver a los demás, las bananas y los peligros, incluso en Parkour para determinar posiciones y ganador. Con ese número de jugadores y objetos, partir la distribución espacial no reduce una carga relevante: el tráfico medido no pasa de 4,3 KB/s.
 
 ## 11. Estado de los casos de prueba
 
@@ -236,8 +229,8 @@ Límite de la autoridad: en Shared Mode cada jugador es State Authority de su pr
 | N-01 | Conexión base | Ejecutado | Bots: crear sala, unirse y ver el mismo lobby, sin errores |
 | N-02 | Input base | Pendiente | Prueba manual con dos instancias; los bots mueven al jugador por teletransporte |
 | N-03 | RTT normal | Ejecutado | Sección 5 |
-| N-04 | RTT adverso | Pendiente | Requiere Clumsy (sección 6) |
-| N-05 | Pérdida de paquetes | Pendiente | Requiere Clumsy (sección 6) |
+| N-04 | RTT adverso | Ejecutado | Sección 6: el RTT pasa de 77 a 159 ms con el perfil del proyecto |
+| N-05 | Pérdida de paquetes | Ejecutado | Sección 6: 5% de pérdida junto con el delay; el Parkour termina igual en los dos clientes. Un corte total de 5 s se recupera y uno de 20 s desconecta |
 | O-01 | Altura de roca reconstruida | Pendiente | Prueba visual en el Tronco |
 | O-02 | Feedback sin spam | Ejecutado | Sección 8.2: 21 bananas, 3 RPC de feedback |
 | C-01 | Pickup simultáneo | Revisión de código | `Consumed` se marca antes de enviar el efecto (sección 8.5) |
@@ -257,7 +250,7 @@ Límite de la autoridad: en Shared Mode cada jugador es State Authority de su pr
 ## 12. Cómo repetir las pruebas
 
 1. Generar el build (Windows, x64) y abrir dos instancias. Con Alt+Enter cada una pasa a ventana para verlas juntas. Crear la sala en una y unirse desde la otra.
-2. Mostrar el overlay con **F3** en las dos y anotar RTT, variación y tráfico durante 60 s de partida en cada perfil.
-3. Para el perfil Adverso: abrir Clumsy como Administrador, pegar el filtro de la sección 4.2, tildar Lag con 150 ms y Drop con 5%, Inbound y Outbound en ambos, y dar Start. Repetir las mismas acciones y anotar las diferencias, incluyendo si algún premio se duplica o los clientes ven resultados distintos.
-4. Para Recuperación y Corte: Drop 100% con Inbound y Outbound, 5 s y 20 s. Anotar si el juego se recupera o vuelve al menú, y con qué mensaje.
-5. Para las bajas abruptas: cerrar una instancia desde el Administrador de tareas en plena partida y medir cuánto tarda la otra en mostrar los resultados (deberían ser unos 10 s).
+2. Mostrar el overlay con **F3** en las dos y anotar RTT, variación y tráfico durante 60 s de partida.
+3. Para el perfil adverso: en `NetworkProjectConfig.fusion`, poner `NetworkConditions.Enabled` en true (los valores ya son 150 ms, 50 ms de jitter y 5% de pérdida). Reiniciar las dos instancias, repetir las mismas acciones y anotar si los dos ven el mismo ganador. **Volver a dejar `Enabled` en false antes de generar el build que se entrega.**
+4. Para un corte: desconectar la red de una de las PCs (o pausar el proceso) durante 5 s y después durante 20 s. A los 5 s la partida tiene que seguir; a los 20 s esa instancia vuelve al menú y la otra resuelve la partida.
+5. Para las bajas abruptas: cerrar una instancia desde el Administrador de tareas en plena partida y medir cuánto tarda la otra en mostrar los resultados (unos 10 s).
