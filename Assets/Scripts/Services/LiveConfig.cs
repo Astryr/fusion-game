@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
+using Unity.Services.Authentication;
 using Unity.Services.RemoteConfig;
 using UnityEngine;
 
@@ -175,6 +176,7 @@ public static class LiveConfig
         try
         {
             await CloudServices.InitializeAsync();
+            ProvidePlayerIdWithoutSession();
             RuntimeConfig runtime = await CloudServices.WithTimeout(
                 RemoteConfigService.Instance.FetchConfigsAsync(new UserAttributes(), new AppAttributes()),
                 FetchTimeout);
@@ -199,6 +201,26 @@ public static class LiveConfig
             LastError = CloudServices.Describe(ex);
             Debug.LogWarning($"[LiveConfig] No se pudo actualizar: {ex.GetType().Name}: {ex.Message}");
         }
+    }
+
+    // Sin sesion, Remote Config avisa "Auth Service not initialized" en cada pedido aunque la respuesta venga completa:
+    // la config base no depende del jugador. Se le da un id de instalacion anonimo; con sesion el SDK usa el PlayerId real.
+    private static void ProvidePlayerIdWithoutSession()
+    {
+        if (AuthenticationService.Instance.IsSignedIn)
+        {
+            return;
+        }
+
+        string id = PlayerPrefs.GetString(CloudConfig.InstallIdPref, string.Empty);
+        if (string.IsNullOrEmpty(id))
+        {
+            id = Guid.NewGuid().ToString("N");
+            PlayerPrefs.SetString(CloudConfig.InstallIdPref, id);
+            PlayerPrefs.Save();
+        }
+
+        RemoteConfigService.Instance.SetPlayerID(id);
     }
 
     private static void Apply(JObject json, ConfigSource source)

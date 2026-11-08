@@ -4,6 +4,7 @@ public static class CloudConfig
     public const string DefaultNickname = "Jugador";
     public const string NicknamePref = "br.nickname";
     public const string PendingPrefPrefix = "br.pending.";
+    public const string InstallIdPref = "br.install";
 
     public const float InitTimeoutSeconds = 12f;
     public const float RequestTimeoutSeconds = 10f;
