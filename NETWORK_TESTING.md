@@ -1,69 +1,142 @@
-# Pruebas de red
+# Documento de optimización y pruebas de red
 
-## Instrumentacion
+Banana Rush · Photon Fusion 2.1.1 · Shared Mode sobre Photon Cloud (región `sa`) · DLL Debug de Fusion · hasta 4 jugadores por sala.
 
-En el Editor y en cualquier build Windows (`UNITY_STANDALONE_WIN`), el juego muestra un overlay de red. **F3** lo oculta o muestra. El overlay toma una muestra de `NetworkRunner.GetPlayerRtt(PlayerRef.None)` cada 0.5 segundos y presenta RTT minimo, promedio y maximo en una ventana movil de hasta 30 segundos, mas una variacion suavizada del RTT y el total local acumulado de RPC de feedback recibidos durante la conexion. La ventana RTT se reinicia al reconectar.
+Todas las cifras de este documento son mediciones reales del 8/11/2026. Lo que no se pudo medir figura como pendiente, con el motivo.
 
-La variacion mostrada no es jitter de llegada de paquetes medido en el transporte: es una estimacion a partir de diferencias entre muestras de RTT. La perdida se inyecta con Network Conditions; el porcentaje configurado es la referencia conocida. Observar tambien pausas, acciones repetidas/perdidas, resultados inconsistentes y desconexiones durante cada perfil.
+## 1. Resumen
 
-## Perfiles
+| Tema | Resultado |
+|---|---|
+| Condiciones normales (2 clientes, Photon Cloud) | RTT 77 ms, propagación host a cliente 132 ms, RPC de ida y vuelta 214 ms, entre 0,5 y 2,2 KB/s por cliente, 0 resimulaciones |
+| Condiciones desfavorables | Pendiente de ejecución con Clumsy (sección 6) |
+| Salida de un jugador | La partida se resuelve sola; detección inmediata si sale ordenado y a los 10 s si desaparece de golpe |
+| Salida del host | Photon reasigna el master client y el manager sigue funcionando; mismo criterio de tiempos |
+| Optimizaciones | Sección 8: 4 propiedades de red eliminadas, efectos por contador en vez de RPC, roca reconstruida, sin toast por banana |
+| Lag Compensation e Interest Management | No se aplican; justificación en la sección 10 |
 
-Abrir `Assets/Photon/Fusion/Resources/NetworkProjectConfig.fusion` con el inspector de Network Project Config. Cambiar Network Conditions y reiniciar ambos runners entre perfiles.
+## 2. Topología y autoridad
 
-| Perfil | Enabled | Delay min/max | Additional jitter | Loss chance min/max |
-|---|---:|---:|---:|---:|
-| Normal | false | - | - | - |
-| Adverso | true | 0.15 s / 0.15 s | 0.05 s | 0.05 / 0.05 |
+Shared Mode: no hay servidor dedicado ni host de verdad. Cada cliente tiene autoridad sobre lo que spawnea y el cliente que Photon marca como master client es el dueño del estado compartido de la partida.
 
-El asset ya contiene los valores adversos, pero `Enabled` esta desactivado por defecto para no degradar partidas normales.
-
-## Procedimiento
-
-1. Conectar dos clientes a la misma sala de Photon, con la misma region y el mismo build. Mantener visible el overlay **RED - DIAGNOSTICO** en ambos.
-2. Ejecutar una ronda de **Tronco gigante** con el perfil Normal. Durante 60 segundos, moverse, saltar, esquivar una piedra y observar un impacto que abra un agujero. Anotar RTT minimo/promedio/maximo, variacion RTT, continuidad de movimiento, resultado del impacto y desconexiones.
-3. Cambiar al perfil Adverso, reiniciar ambos runners y repetir exactamente las mismas acciones. Anotar los mismos datos y cualquier diferencia de estado entre clientes.
-4. Repetir con otro minijuego que use interacciones entre jugadores y registrar si la latencia cambia el resultado, no solo la animacion.
-
-## Registro de ejecucion
-
-| Perfil | RTT min/prom/max y variacion | Observaciones de juego | Problemas reproducidos |
-|---|---|---|---|
-| Normal | No medida | Prueba no realizada; requiere dos clientes | Sin observaciones de ejecucion |
-| Adverso | No medida | Prueba no realizada; requiere dos clientes | Sin observaciones de ejecucion |
-
-Observacion de configuracion: Network Conditions estaba desactivado en el asset al iniciar este registro. No se completaron pruebas en vivo porque este entorno no tiene dos clientes de Fusion conectados; no se atribuyen valores de RTT ni fallos no medidos.
-
-## Lag compensation
-
-No se aplica lag compensation a este juego. No hay disparos hitscan ni ataques del jugador que dependan de acertar a otro jugador en una posicion pasada. Las piedras y los agujeros son peligros ambientales: la autoridad de estado calcula su avance y las eliminaciones en ticks de simulacion. Rebobinar solo la posicion del jugador, sin rebobinar tambien el estado historico de la piedra y del tronco, podria convertir una esquiva actual en un impacto falso. Si se agrega una interaccion de punteria directa, volver a evaluar el requisito con hitboxes historicos y el modo de Fusion utilizado.
-
-## Sincronizacion, autoridad y costo
-
-| Dato | Actualizacion/autoridad | Tratamiento |
+| Dato | State Authority | Cómo se replica |
 |---|---|---|
-| Input horizontal y botones | Enviado por Fusion desde el Input Authority para la simulacion | No se reemplaza por RPC por boton/frame. |
-| Transform del jugador | `NetworkTransform` del prefab `Player`; actualizado durante movimiento | Necesario para interpolacion, caidas y posicion visible a los otros 3 jugadores. |
-| Puntaje, ready, eliminado y stun | Estado del objeto Player; el owner actualiza su puntaje al recoger bananas y al realizar acciones; el manager escribe premios de Parkour/Copa | RPC verifica Input Authority o State Authority del manager; solicitudes de score se limitan a fase, juego y delta permitido. Cupos y eliminaciones remotas requieren al manager. |
-| Fase, ganador y resultados | Objeto `BananaGameManager`; State Authority | Solo el manager cierra la partida. Un reclamo remoto debe venir del jugador nombrado, seguir vivo y cumplir el umbral del minijuego. |
-| Roca del tronco | `LogHoleMask` cambia al impactar; activo, X, hora de inicio y velocidad cambian al aparecer/desaparecer | Y se reconstruye localmente desde `MatchTime`; no se envia cada tick. |
-| Feedback global | Solo lo envia el State Authority del manager | La recoleccion de bananas ya no emite un toast global redundante: el puntaje sincronizado y el popup local bastan. El overlay cuenta los RPC globales restantes. |
-| Banana individual | NetworkObject mientras cae; el manager la crea y su State Authority la consume | Es necesaria por movimiento y colision independientes. La recoleccion verifica fase, Input Authority reclamante y distancia <= 1.25 unidades. |
+| Jugador: posición, animación, puntaje, ready, eliminado, calor | Dueño del jugador | `NetworkTransform` y propiedades `[Networked]` del prefab `Player` |
+| Input horizontal y botones | Dueño del jugador | Canal de input de Fusion (`NetworkInputData`), sin RPC por tecla |
+| Fase, cuenta atrás, ganador, resultados, reglas activas | Master client (`BananaGameManager`, flag `SharedModeStateAuthMasterClient`) | `[Networked]` del manager |
+| Bananas | Master client | Un `NetworkObject` por banana mientras cae |
+| Efectos puntuales (popup, destello, sonido) | Dueño del jugador | Contador `[Networked]` por jugador (sección 8.3) |
+| Roca del Tronco | Master client | Hora de inicio y velocidad; la altura se calcula en cada peer |
 
-**Optimizacion concreta:** antes, `LogRockY` era una propiedad de red que cambiaba en cada tick mientras caia una roca. Se sustituyo por `LogRockStartTime` y `LogRockSpeed`, escritos una vez por roca; como `MatchTime` ya es el reloj sincronizado, cada cliente reconstruye Y. Se elimina una actualizacion de float por tick durante cada caida. La instrumentacion tambien cuenta RPC de feedback para observar su frecuencia; el toast por banana era un mensaje global redundante con el estado de puntaje.
+No se implementa migración de host propia: no hace falta en Shared Mode, Photon reasigna el master client y el manager viaja con él (sección 7).
 
-**Acceso simultaneo a una banana:** el primer reclamo que llega al State Authority de esa banana se valida por fuente, fase y distancia. La autoridad marca `Consumed` antes de enviar el efecto al jugador; las solicitudes posteriores se rechazan, por lo que un objeto compartido no puede dar dos recompensas.
+## 3. Instrumentación
 
-**Interest Management / AoI:** no se activa. La sala admite como maximo 4 jugadores y una unica arena; todos necesitan observar a los demas, las bananas y los peligros, incluso en Parkour para determinar posiciones y ganador. La poblacion y el numero de objetos no justifican particionar la distribucion espacial en este juego.
+### 3.1 Overlay en el juego
 
-**Limite de autoridad:** en Fusion Shared Mode cada jugador conserva State Authority de su propio Player. Las comprobaciones impiden que otros peers escriban ese objeto y limitan acciones recibidas; no pretenden demostrar que el jugador propietario no manipula su propia ejecucion. No se agrega anticheat externo.
+**F3** muestra u oculta el overlay en el Editor y en los builds de Windows. Arranca oculto; también se activa desde AJUSTES en el menú. Muestra:
 
-## Optimizaciones con evidencia
+- RTT promedio, mínimo y máximo con `NetworkRunner.GetPlayerRtt`, una muestra cada 0,5 s en una ventana móvil de 30 s.
+- Variación del RTT: diferencia suavizada entre muestras consecutivas. No es jitter de llegada de paquetes medido en el transporte.
+- Tráfico entrante y saliente en KB/s y paquetes por segundo, tomado de `FusionStatisticsManager.SimulationSnapshot`. Solo hay datos con la DLL Debug de Fusion, que es la que está activa.
+- Cantidad de RPC de feedback global recibidos en la conexión.
+- Fuente y revisión de la configuración remota, y si coincide con la del host.
 
-Los fragmentos siguientes corresponden al codigo actual. Se incluyen para explicar las decisiones y facilitar la revision; no son resultados de pruebas ejecutadas.
+### 3.2 Bots de prueba
 
-### 1. Altura de roca reconstruida
+Las mediciones automáticas se hicieron con dos procesos del build (host y cliente) contra Photon Cloud, controlados por un harness de bots que no forma parte del proyecto entregado. Cada bot juega partidas completas y registra tiempos con marcas UTC. Los dos procesos corren en la misma PC, así que comparten reloj. Los escenarios usados fueron: `latency`, `happy`, `rain`, `parkour`, `hostleaves`, `kill`, `latejoin`.
 
-`LogRockY` ya no es un campo de red que cambia todos los ticks. Al aparecer una roca, la autoridad publica su X, hora de inicio y velocidad. Cada peer reconstruye Y con el reloj de partida sincronizado:
+- **Propagación host a cliente:** el host cambia el minijuego seleccionado (`[Networked]` del manager) y anota la hora UTC; el cliente anota la hora en que ve el cambio. 6 muestras. Resolución de un frame (16,7 ms) por lado.
+- **RPC de ida y vuelta:** el cliente llama a `RPC_RequestSelectGame` (RPC hacia la State Authority) y mide hasta ver el valor reflejado en su copia del estado. 6 muestras.
+- **Bajas abruptas:** un script mata el proceso con `Stop-Process -Force`, sin cierre ordenado de la conexión.
+
+## 4. Simulación de red
+
+### 4.1 Network Conditions de Fusion no sirve en Shared Mode
+
+La versión anterior de este documento proponía activar Network Conditions en `NetworkProjectConfig.fusion`. Se midió y no tiene efecto sobre el tráfico de juego en Shared Mode:
+
+| Medición (6 muestras cada una) | Sin simulación | Network Conditions: 400 ms de delay y 10% de pérdida |
+|---|---:|---:|
+| Propagación host a cliente | 132 ms | 125 ms |
+| RPC de ida y vuelta | 214 ms | 217 ms |
+| RTT promedio | 77 ms | 77 ms |
+
+El delay de 400 ms habría sumado más de 800 ms de RTT; no apareció. El perfil "adverso" de ese método daba números iguales a los normales, por eso se descartó.
+
+### 4.2 Clumsy (método adoptado)
+
+Se usa [Clumsy 0.3](https://github.com/jagt/clumsy/releases/tag/0.3) (basado en WinDivert), la herramienta que recomienda Photon en su guía de diagnóstico de desconexiones. Instala un driver al arrancar, así que hay que ejecutarlo como **Administrador**.
+
+Filtro, tal como lo documenta Photon, para afectar solo el tráfico de juego contra el Game Server (puertos UDP 5056 o 27002):
+
+```text
+udp.DstPort == 5056 or udp.SrcPort == 5056 or udp.DstPort == 27002 or udp.SrcPort == 27002
+```
+
+| Perfil | Configuración en Clumsy |
+|---|---|
+| Normal | Clumsy cerrado |
+| Adverso | Lag 150 ms y Drop 5%, con Inbound y Outbound tildados en ambos. Suma unos 300 ms de RTT |
+| Recuperación | Drop 100% con Inbound y Outbound durante 5 s, después Stop |
+| Corte | Drop 100% con Inbound y Outbound durante 20 s, sin parar |
+
+## 5. Resultados en condiciones normales
+
+Dos clientes en la misma PC contra Photon Cloud, build de desarrollo, 60 FPS, DLL Debug.
+
+| Métrica | Resultado |
+|---|---|
+| RTT promedio / mínimo / máximo | 77 ms / 63-66 ms / 100-117 ms |
+| Variación del RTT | 2,4 a 8,8 ms según la corrida |
+| Propagación host a cliente (6 muestras) | 112, 117, 150, 117, 150, 149 ms. Promedio 132 ms |
+| RPC de ida y vuelta (6 muestras) | 200, 250, 217, 217, 217, 183 ms. Promedio 214 ms |
+| Paquetes | 32 por segundo entrantes, 16 por segundo salientes |
+| Resimulaciones | 0 |
+
+Tráfico por escenario (promedio de toda la corrida, incluido el lobby):
+
+| Escenario | Host entra / sale | Cliente entra / sale |
+|---|---:|---:|
+| Solo lobby, 2 jugadores (`latency`) | 522 / 233 B/s | 692 / 186 B/s |
+| Lluvia de bananas hasta los 100 puntos, 53 s de partida (`rain`) | 570 / 885 B/s | 2174 / 217 B/s |
+| Tronco, 2 partidas de bananas y salida (`happy`) | 555 / 685 B/s | 1641 / 202 B/s |
+
+El que más recibe es el cliente que no es master en la lluvia de bananas, porque el master spawnea cada banana. Aun así son unos 2 KB/s. Todo se midió con 2 jugadores; con 4 se espera que el tráfico entrante crezca con la cantidad de jugadores remotos, pero no se midió.
+
+Comprobaciones funcionales de las mismas corridas, todas correctas: lobby y listos consistentes, premios de Copa (+4 al ganador, +3 al segundo), ganador y puntaje iguales en ambos clientes, vuelta al lobby con el jugador reseteado, y los efectos de un jugador (popups de puntos y OUT) visibles en el otro cliente.
+
+## 6. Resultados en condiciones desfavorables
+
+**Estado: pendiente de ejecución.** Clumsy exige permisos de administrador y un driver, así que no se puede lanzar de forma automática. Procedimiento para completarla (sección 12) y tabla a llenar:
+
+| Perfil | RTT prom / mín / máx | Propagación host a cliente | RPC de ida y vuelta | Tráfico entra / sale | Resultado funcional |
+|---|---|---|---|---|---|
+| Normal | 77 / 65 / 100 ms | 132 ms | 214 ms | 692 / 186 B/s (lobby) | Correcto |
+| Adverso (150 ms + 5%) | Pendiente | Pendiente | Pendiente | Pendiente | Pendiente |
+| Recuperación (5 s sin red) | Pendiente | - | - | - | Pendiente |
+| Corte (20 s sin red) | - | - | - | - | Pendiente |
+
+Qué se espera, por el código y la configuración: Fusion reintenta lo que no llegó, así que con 5% de pérdida no debería haber recompensas duplicadas ni dos ganadores, porque todo premio sale de la autoridad (sección 9). Con un corte de 20 s se supera `ConnectionTimeout` (10 s): el cliente debe volver al menú con el mensaje "Te desconectaste: Se perdió la conexión con Photon." y el resto de los jugadores resolver la partida como en la sección 7.
+
+## 7. Salidas y desconexiones
+
+| Evento | Qué pasa | Evidencia |
+|---|---|---|
+| Un jugador sale en plena partida, de forma ordenada | Se despawnea su `Player`. Si queda un solo jugador y no es modo prueba, gana el que queda (detalle "el resto se desconectó"), se reparte la Copa y se vuelve al lobby con la sala reabierta | Bots, escenario `happy`: la sala queda con 1 jugador y abierta |
+| Un jugador desaparece de golpe (proceso muerto) | Igual que el caso anterior, pero Photon lo detecta al vencer `ConnectionTimeout` de 10 s | Bots, escenario `kill`: el host lo notó a los **10,1 s**, mostró resultados en el mismo instante, ganó el que quedaba y la sala se reabrió con 1 jugador |
+| El host sale de forma ordenada | Photon reasigna el master client. El manager pasa al nuevo master sin demora visible, la partida en curso se cierra con ganador el que queda y el lobby se reabre. El modo prueba sigue funcionando | Bots, escenario `hostleaves`: nuevo master y State Authority del manager de inmediato; 7 comprobaciones correctas |
+| El host desaparece de golpe | Igual, pero el nuevo master aparece al vencer el timeout | Bots, `hostleaves` con el proceso del host muerto: nuevo master a los **10,3 s**, el manager respondió de inmediato, resultados, lobby y modo prueba correctos |
+| Alguien intenta entrar con la partida empezada | Se rechaza: la sala se cierra al empezar la cuenta atrás. Mensaje: "La partida ya empezó. Probá de nuevo cuando termine." | Bots, escenario `latejoin` con un tercer cliente |
+| El propio cliente pierde la conexión | Fusion cierra el runner (`ConnectionTimeout`, `PhotonCloudTimeout` u `OperationTimeout`), el juego vuelve al menú y muestra "Te desconectaste: Se perdió la conexión con Photon." | Código en `NetworkRunnerHandler.OnShutdown`. Pendiente de prueba real con el perfil Corte |
+
+El timeout de 10 s sale de `Network.ConnectionTimeout` en `NetworkProjectConfig.fusion` y coincide con lo medido. Acortarlo detectaría las bajas antes pero aumentaría las desconexiones falsas con redes inestables; se deja el valor por defecto.
+
+## 8. Optimizaciones
+
+### 8.1 Altura de la roca reconstruida
+
+Antes, `LogRockY` era una propiedad de red que cambiaba en cada tick mientras caía una roca. Ahora la autoridad escribe `LogRockStartTime` y `LogRockSpeed` una vez por roca, y cada peer calcula la altura con `MatchTime`, que ya está sincronizado:
 
 ```csharp
 private float RockYAt(float matchTime)
@@ -73,67 +146,50 @@ private float RockYAt(float matchTime)
 }
 ```
 
-La posicion se inicializa por evento, no mediante una escritura de float por tick durante toda la caida. `LogHoleMask` tambien se modifica solamente al impacto. El objetivo de la prueba es comprobar que todos ven una trayectoria equivalente y que el agujero aparece una sola vez.
+Se elimina una actualización de float por tick durante cada caída. `LogHoleMask` solo cambia al impactar.
 
-### 2. Feedback global sin spam por banana
+### 8.2 Feedback global sin spam por banana
 
-El puntaje se actualiza en el estado del jugador y el popup de puntos es local. Por eso recoger una banana no necesita ademas mandar un toast global por cada colision. Los toasts globales restantes se limitan a eventos de ronda, resultados y avisos puntuales:
+Recoger una banana no manda un toast global: el puntaje ya está en el estado del jugador y el efecto sale del contador de la sección 8.3. Los RPC globales (`RPC_ShowFeedback`) quedan para eventos de ronda y resultados. Evidencia medida en el escenario `rain`: 21 bananas recogidas entre los dos jugadores y el contador de RPC de feedback recibidos terminó en 3.
+
+### 8.3 Efectos puntuales por contador en vez de RPC
+
+Los efectos de un jugador (popup de puntos, OUT, golpe de pecho, progreso, destello de color y sonido) se disparan desde la State Authority del jugador subiendo un contador. Cada cliente lo ve cambiar y reproduce el efecto:
 
 ```csharp
-[Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-public void RPC_ShowFeedback(NetworkString<_64> message, int tone)
-{
-	FeedbackRpcCount++;
-	// Mostrar el toast local en cada peer.
-}
+[Networked] private int FxSeq { get; set; }
+[Networked] private PlayerFx FxKind { get; set; }
+[Networked] private int FxValue { get; set; }
 ```
 
-`FeedbackRpcCount` es un contador de ejecuciones de este RPC en la instancia local. No cuenta todos los RPC, objetos, bytes ni paquetes. La prueba compara el valor antes y despues de recoger varias bananas: recogerlas no deberia incrementarlo; un evento global, como comenzar la ronda, si.
+Frente a un RPC a todos por evento:
 
-### 3. Reclamo unico del recurso compartido
+- No hay mensaje extra: viaja con el estado del jugador que ya se replica, 12 bytes por jugador.
+- Un cliente que entra o se reconecta no repite efectos viejos: inicializa el contador en `Spawned`.
+- Si caen varios eventos entre dos snapshots, se reproduce el último. Los golpes de pecho de otros jugadores pueden ser decenas por segundo y así no saturan; el sonido ajeno además se limita a uno cada 0,12 s.
 
-La banana valida fase, jugador y distancia en su State Authority. Al aceptar el primer reclamo, marca `Consumed` antes de enviar el efecto y despawnear el objeto:
+Medido con bots: en `rain`, el host vio 14 popups de banana del otro jugador y el cliente vio 14 propios más 7 del host. En `happy`, el host vio el OUT del cliente en el Tronco.
+
+### 8.4 Propiedades de red muertas eliminadas
+
+Quedaban cuatro propiedades `[Networked]` de una mecánica descartada (aturdimiento con cáscaras) que nadie escribía ni leía: `IsStunned` y `StunUntil` en cada jugador, `IsStunPeel` y `StunSeconds` en cada banana. Se eliminaron junto con sus RPC. Cada jugador replica 8 bytes menos y cada banana otros 8, y una banana pasó a tener solo `Consumed` y `NetPointValue`.
+
+### 8.5 Reclamo único de un recurso compartido
+
+La banana valida fase, jugador y distancia en su State Authority, y marca `Consumed` antes de enviar el efecto. Los reclamos que llegan después encuentran `Consumed == true` y no hacen nada, así que dos jugadores sobre la misma banana no la cobran dos veces:
 
 ```csharp
 PlayerRef bananaAuthority = Object.StateAuthority;
 int points = NetPointValue != 0 ? NetPointValue : _pointValue;
 Consumed = true;
+
 player.ReceiveBananaHit(points, bananaAuthority);
 Runner.Despawn(Object);
 ```
 
-El mismo camino aplica stun para las cascaras. Solicitudes repetidas encuentran `Consumed == true` y no vuelven a aplicar el efecto. El resultado esperado ante dos reclamos concurrentes es una sola banana consumida y una sola recompensa.
+### 8.6 Input por el canal de Fusion
 
-### 4. Validacion de score por fuente y minijuego
-
-La RPC no acepta cualquier entero enviado por cualquier peer. En fase de juego, el origen debe ser el Input Authority correspondiente, salvo el score de Parkour que escribe el manager State Authority:
-
-```csharp
-else if (info.Source != Object.InputAuthority || !IsValidPlayerScoreChange(manager, score))
-{
-	return;
-}
-```
-
-Los deltas del jugador se limitan a un punto para Memotest y Rompe el Arbol; el score de Parkour se limita al intervalo de puestos. La prueba intenta un score negativo, un salto de muchos puntos, un score en otra fase y una fuente que no sea el owner. Ninguno debe cambiar `Score`.
-
-### 5. Victoria verificada por el manager
-
-El manager comprueba identidad del emisor, que el jugador exista y siga vivo, y el umbral correspondiente al minijuego:
-
-```csharp
-if (Phase != MatchPhase.Playing || info.Source != player)
-	return;
-
-if (winner == null || winner.IsEliminated || !IsValidWinnerClaim(winner))
-	return;
-```
-
-Umbrales comprobados: 100 puntos en Lluvia de bananas, 9 pares en Memotest, 30 golpes en Rompe el Arbol y 50 puntos en Golpeo de pecho. En Parkour y Tronco gigante el resultado se decide desde la autoridad de la partida. La prueba envia reclamos prematuros y de jugadores eliminados: la fase debe seguir en `Playing`.
-
-### 6. Input separado de RPC
-
-El input de movimiento es pequeno y se entrega por el canal de input de Fusion:
+El movimiento viaja como `NetworkInputData` por el canal de input; no hay un RPC por tecla ni por frame.
 
 ```csharp
 public struct NetworkInputData : INetworkInput
@@ -143,44 +199,65 @@ public struct NetworkInputData : INetworkInput
 }
 ```
 
-El movimiento no genera un RPC manual por tecla o frame. Fusion replica la transformacion del prefab Player con `NetworkTransform`; los estados de score, ready y eliminacion se mantienen en el objeto Player. La prueba busca movimiento remoto continuo sin una RPC por cada pulsacion.
+### 8.7 Decoración local en lugar de NetworkObjects
 
-### 7. Decoracion local, no NetworkObjects
+Los cocos de la avalancha del Parkour son decoración local que se anima desde `AvalancheX`. No se crean 144 `NetworkObject` ni se transmiten giros por tick; la autoridad solo sincroniza la posición de la avalancha, que es la que decide las eliminaciones.
 
-Los cocos de la avalancha de Parkour son decoracion local y se animan desde `AvalancheX`; no se crean 144 NetworkObjects ni se transmiten giros por tick. La autoridad sincroniza la posicion de la avalancha que se usa para la eliminacion. La prueba debe confirmar que los cocos se ven animados en ambos clientes, que las eliminaciones siguen coincidiendo con `AvalancheX` y que no aparecen cocos en el inventario de NetworkObjects.
+### 8.8 Sonido y efectos locales
 
-## Casos de prueba propuestos
+El sonido se sintetiza por código al arrancar y se reproduce de forma local: no hay audio ni efectos viajando por la red.
 
-No se realizaron los casos de esta tabla: requieren una sesion con dos clientes conectados. Los resultados indicados son esperados, no observaciones medidas.
+## 9. Validación en la autoridad
 
-| ID | Caso | Pasos | Resultado esperado |
+| Acción | Validación |
+|---|---|
+| `RPC_SetScore` | Solo en fase de juego, desde el Input Authority del jugador (o el manager en Parkour), con deltas de un punto en Memotest y Rompe el Árbol y rango de puestos en Parkour |
+| `RPC_DeclareWinner` | Fase de juego, emisor igual al jugador nombrado, jugador vivo y umbral del minijuego cumplido (100 puntos, 9 pares, 30 golpes, 50 puntos). El texto de victoria lo decide la autoridad: un cliente ya no puede mandar el detalle que ven los demás |
+| `RPC_AddCupScore` | Solo el State Authority del manager, entre 1 y 4 veces el multiplicador de Copa |
+| `RPC_Eliminate`, `RPC_Teleport`, `RPC_PrepareForMatch`, `RPC_ResetForLobby`, `RPC_ForceUnready` | Solo el State Authority del manager (y el propio jugador para eliminarse), con la fase correcta |
+| `RPC_SetReady` | Solo el Input Authority del jugador y solo en el lobby |
+| Recoger una banana | Fase, jugador reclamante, distancia de 1,25 unidades o menos y `Consumed` falso |
+| `RPC_ShowFeedback` | Solo lo puede enviar la State Authority del manager |
+| Selección de minijuego | Solo jugadores conectados, en el lobby y con el minijuego habilitado |
+| Chat | Solo el dueño del jugador, texto saneado y limitado a 100 caracteres |
+
+Límite de la autoridad: en Shared Mode cada jugador es State Authority de su propio `Player`. Estas comprobaciones impiden que otros peers lo escriban y acotan lo que se acepta, pero no demuestran que el dueño no manipule su propia ejecución. No se agrega anticheat externo.
+
+## 10. Lag Compensation e Interest Management
+
+**Lag Compensation: no se aplica.** No hay disparos ni ataques entre jugadores que dependan de acertar a otro en una posición pasada. Las piedras y los agujeros son peligros ambientales que calcula la autoridad. Rebobinar solo al jugador, sin rebobinar la piedra y el tronco históricos, convertiría una esquiva actual en un impacto falso. En `NetworkProjectConfig.fusion` está desactivada (`LagCompensation.Enabled: false`). Si algún día se agrega una interacción de puntería directa, hay que reevaluarlo.
+
+**Interest Management: no se aplica.** La sala admite 4 jugadores y una única arena: todos necesitan ver a los demás, las bananas y los peligros, incluso en Parkour para determinar posiciones y ganador. Con ese número de jugadores y objetos, partir la distribución espacial no reduce una carga relevante: el tráfico medido es de unos 2 KB/s.
+
+## 11. Estado de los casos de prueba
+
+| ID | Caso | Estado | Evidencia |
 |---|---|---|---|
-| N-01 | Conexion base | Abrir dos builds Windows, crear y buscar la misma sala, unirse y esperar a ambos jugadores. | Ambos ven el mismo lobby; sin errores ni desconexion. |
-| N-02 | Input base | Moverse, saltar y cambiar de direccion desde ambos clientes. | Cada cliente controla su player; el otro ve movimiento interpolado, sin RPC manual por tecla. |
-| N-03 | RTT normal | Network Conditions desactivado; jugar 60 s con overlay visible. | RTT registra muestras; anotar min/prom/max y variacion; acciones y posiciones convergen. |
-| N-04 | RTT adverso | Activar perfil Adverso y reiniciar ambos runners; repetir N-03. | RTT/variacion reflejan la condicion impuesta; el resultado final sigue siendo unico y consistente. |
-| N-05 | Perdida de paquetes | Con el perfil Adverso, jugar una ronda completa y observar inputs, pickups y fase final. | Registrar pausas o correcciones; no deben duplicarse recompensas ni declararse dos ganadores. |
-| O-01 | Altura reconstruida | En Tronco gigante, seguir una roca desde el spawn hasta el impacto en ambos clientes. | Las rocas se mueven hacia abajo; impacto y agujero coinciden aunque Y no sea un campo de red por tick. |
-| O-02 | Feedback | Anotar el contador; recoger 5 bananas y luego provocar un aviso global de ronda. | Recoger bananas no suma RPC de feedback; el aviso global suma una ejecucion local por peer. |
-| C-01 | Pickup simultaneo | Hacer que dos jugadores toquen la misma banana en el mismo intervalo de simulacion. | Solo un reclamo valido consume la banana; una sola recompensa o stun. |
-| C-02 | Pickup fuera de rango | Enviar una solicitud cuando el player este a mas de 1.25 unidades de la banana. | La autoridad rechaza el reclamo; no cambia score/stun y la banana sigue activa. |
-| A-01 | Score adulterado | Probar en una build de test score negativo, incremento mayor al permitido y score en lobby. | El estado de `Score` queda igual; no se declara ganador. |
-| A-02 | Fuente incorrecta | Un peer solicita modificar el Player de otro peer. | La autoridad rechaza el RPC; el objeto del otro jugador no cambia. |
-| A-03 | Victoria prematura | Reclamar ganador sin alcanzar el umbral o luego de ser eliminado. | `Phase` permanece en `Playing`; no se abre Results ni se premian puntos de Copa. |
-| A-04 | Seleccion en lobby | Un jugador conectado solicita cambiar minijuego en Lobby; repetir desde una fuente no conectada/fase Playing. | La solicitud valida se acepta solo en Lobby; fuentes ajenas o fase incorrecta no cambian `SelectedGame`. |
-| A-05 | Feedback falsificado | Intentar invocar `RPC_ShowFeedback` desde una fuente que no sea State Authority. | Fusion rechaza la fuente o no se muestra el toast; el contador no aumenta por el intento invalido. |
-| A-06 | Desconexion | Desconectar un cliente durante lobby y durante partida. | La lista se actualiza; se conserva el flujo existente de reabrir lobby o terminar si queda un jugador. |
-| V-01 | Cocos locales | Comparar la avalancha en los dos clientes durante Parkour. | La decoracion cae localmente; el valor autoritativo de `AvalancheX` determina eliminacion y ganador. |
-| V-02 | AoI | Revisar objetos visibles con el maximo actual de 4 jugadores y una arena compartida. | Todos necesitan los mismos players y hazards; no se habilita AoI porque no reduce una carga relevante. |
+| N-01 | Conexión base | Ejecutado | Bots: crear sala, unirse y ver el mismo lobby, sin errores |
+| N-02 | Input base | Pendiente | Prueba manual con dos instancias; los bots mueven al jugador por teletransporte |
+| N-03 | RTT normal | Ejecutado | Sección 5 |
+| N-04 | RTT adverso | Pendiente | Requiere Clumsy (sección 6) |
+| N-05 | Pérdida de paquetes | Pendiente | Requiere Clumsy (sección 6) |
+| O-01 | Altura de roca reconstruida | Pendiente | Prueba visual en el Tronco |
+| O-02 | Feedback sin spam | Ejecutado | Sección 8.2: 21 bananas, 3 RPC de feedback |
+| C-01 | Pickup simultáneo | Revisión de código | `Consumed` se marca antes de enviar el efecto (sección 8.5) |
+| C-02 | Pickup fuera de rango | Revisión de código | `IsValidConsumeClaim` exige distancia de 1,25 o menos |
+| A-01 | Score adulterado | Revisión de código | `RPC_SetScore` e `IsValidPlayerScoreChange` |
+| A-02 | Fuente incorrecta | Revisión de código | Las comprobaciones de `info.Source` de la sección 9 |
+| A-03 | Victoria prematura | Revisión de código | `RPC_DeclareWinner` e `IsValidWinnerClaim` |
+| A-04 | Selección en lobby | Revisión de código | `RPC_RequestSelectGame` |
+| A-05 | Feedback falsificado | Revisión de código | `RPC_ShowFeedback` es `RpcSources.StateAuthority` |
+| A-06 | Desconexión | Ejecutado | Sección 7 |
+| E-01 | Efectos visibles en el otro cliente | Ejecutado | Sección 8.3 |
+| V-01 | Cocos locales | Pendiente | Prueba visual en Parkour |
+| V-02 | AoI | Justificado | Sección 10 |
 
-## Plantilla de resultados
+"Revisión de código" significa que la validación existe y se leyó, pero no se probó contra un cliente modificado.
 
-Completar con mediciones de una ejecucion real:
+## 12. Cómo repetir las pruebas
 
-| Caso | Build/region | Perfil de red | RTT min/prom/max | Feedback RPC | Resultado funcional | Incidente |
-|---|---|---|---|---:|---|---|
-| N-03 normal | No realizada | Normal | No medida | No medido | No registrado | No registrado |
-| N-04 adverso | No realizada | Adverso | No medida | No medido | No registrado | No registrado |
-| C-01 simultaneo | No realizada | Normal/adverso | No medida | No medido | No registrado | No registrado |
-
-Estas pruebas no se hicieron en esta sesion: no hay resultados multicliente registrados. Completar la tabla con mediciones reales antes de afirmar que se verificaron latencia, perdida o concurrencia.
+1. Generar el build (Windows, x64) y abrir dos instancias. Con Alt+Enter cada una pasa a ventana para verlas juntas. Crear la sala en una y unirse desde la otra.
+2. Mostrar el overlay con **F3** en las dos y anotar RTT, variación y tráfico durante 60 s de partida en cada perfil.
+3. Para el perfil Adverso: abrir Clumsy como Administrador, pegar el filtro de la sección 4.2, tildar Lag con 150 ms y Drop con 5%, Inbound y Outbound en ambos, y dar Start. Repetir las mismas acciones y anotar las diferencias, incluyendo si algún premio se duplica o los clientes ven resultados distintos.
+4. Para Recuperación y Corte: Drop 100% con Inbound y Outbound, 5 s y 20 s. Anotar si el juego se recupera o vuelve al menú, y con qué mensaje.
+5. Para las bajas abruptas: cerrar una instancia desde el Administrador de tareas en plena partida y medir cuánto tarda la otra en mostrar los resultados (deberían ser unos 10 s).

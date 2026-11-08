@@ -104,6 +104,7 @@ public static class GameChat
             History.RemoveAt(0);
         }
 
+        GameSfx.Play(Sfx.Chat, 0.6f);
         MessageReceived?.Invoke(entry);
     }
 

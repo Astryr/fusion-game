@@ -32,9 +32,7 @@ Caidos: ...
 
 3.3. Sobreviviente del Tronco Gigante
 Objetivo: Gana el ultimo mono en permanecer sobre el tronco.
-Propuestas de diseño (2 opciones):
-Opción 1 (Empujones y Cáscaras): Esta es la que esta en el juego. Los monos se paran sobre un tronco. Se pueden empujar entre ellos. El tronco se va achicando. A los 45 segundos empiezan a caer cascaras que aturden 3 segundos. Quien se cae del tronco queda fuera. Gana el ultimo que queda arriba.
-Opción 2 (Tronco Movedizo y Destrucción): No esta en el juego. Queda como idea: tronco en movimiento, piedras de monos espectadores y el tronco destruyendose.
+Mecánica: Los monos se paran sobre un tronco gigante y se pueden empujar entre ellos. Cada tanto cae una piedra que rompe un pedazo del tronco y deja un agujero; si la piedra le cae a un jugador, queda fuera. Quien se cae al vacio tambien queda fuera. Gana el ultimo que queda arriba. Si pasan 95 segundos, gana el que este mas cerca del centro del tronco. Las piedras caen cada vez mas seguido y mas rapido.
 
 3.4. Golpeo de Pechos
 Objetivo: Gana quien logre realizar el golpe de pechos mas fuerte.
@@ -47,3 +45,8 @@ Mecánica: Cada jugador ve su propio tablero (las mismas figuras, distintas posi
 3.6. Destrucción del Árbol
 Objetivo: Gana el primer jugador en romper el arbol.
 Mecánica: En la pantalla van apareciendo teclas al azar. Hay que apretar la tecla correcta para golpear el tronco. El primero que llega a 30 golpes buenos gana. Una tecla incorrecta o no apretar a tiempo resta 1 punto. A veces aparece una tecla roja de trampa: si se aprieta, tambien resta 1.
+
+4. Sonido, chat y servicios online
+Sonido: hay musica de menu y de minijuegos, y efectos para recoger bananas, saltar, ser eliminado, la cuenta atras, ganar o perder, el chat y los botones. Los efectos de un jugador (puntos, eliminacion, golpes) los ven y escuchan todos. En AJUSTES del menu se regula el volumen de la musica y de los efectos.
+Chat: con ENTER se abre un chat de texto en el lobby y en la partida, con el nombre y el color de cada jugador.
+Ranking y configuracion: los puntos de Copa de cada partida de 2 o mas jugadores se suman a un ranking global (RANKING en el menu). El balance de los minijuegos y algunos avisos se pueden cambiar sin sacar una build nueva con Remote Config.

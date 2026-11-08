@@ -24,9 +24,12 @@ public class PlayerController : NetworkBehaviour
     [Networked] public NetworkString<_32> Nickname { get; set; }
     [Networked] public NetworkBool IsReady { get; set; }
     [Networked] public NetworkBool IsEliminated { get; set; }
-    [Networked] public NetworkBool IsStunned { get; set; }
     [Networked] public float Heat { get; set; }
-    [Networked] public float StunUntil { get; set; }
+
+    // Efectos puntuales (popup, destello, sonido): la autoridad sube el contador y cada cliente lo reproduce al verlo cambiar.
+    [Networked] private int FxSeq { get; set; }
+    [Networked] private PlayerFx FxKind { get; set; }
+    [Networked] private int FxValue { get; set; }
 
     public static PlayerController Local { get; private set; }
 
@@ -61,6 +64,14 @@ public class PlayerController : NetworkBehaviour
     private float _deathY = -8f;
     private bool _allowPush;
     private NetworkButtons _previousButtons;
+    private int _seenFxSeq;
+    private float _flashUntil;
+    private float _flashLength = 1f;
+    private Color _flashColor = Color.white;
+    private float _lastRemoteSfxAt;
+    private bool _wasGrounded = true;
+    private float _groundedY;
+    private float _airborneSince = -1f;
 
     private static readonly int SpeedParam = Animator.StringToHash("Speed");
     private static readonly int GroundedParam = Animator.StringToHash("Grounded");
@@ -100,6 +111,10 @@ public class PlayerController : NetworkBehaviour
         EnsureAnimatorReady();
         EnsureNameLabel();
 
+        _seenFxSeq = FxSeq;
+        _wasGrounded = NetGrounded;
+        _groundedY = transform.position.y;
+
         if (Object.HasInputAuthority)
         {
             Local = this;
@@ -126,7 +141,9 @@ public class PlayerController : NetworkBehaviour
 
     public override void Render()
     {
+        PollFx();
         ApplyColor();
+        UpdateJumpSound();
         UpdateFacingAndAnimator();
         if (_nameLabel != null && IsSpawned)
         {
@@ -178,11 +195,6 @@ public class PlayerController : NetworkBehaviour
 
     public override void FixedUpdateNetwork()
     {
-        if (Object.HasStateAuthority && IsStunned && Runner.SimulationTime >= StunUntil)
-        {
-            IsStunned = false;
-        }
-
         if (!GetInput(out NetworkInputData input))
         {
             return;
@@ -203,7 +215,7 @@ public class PlayerController : NetworkBehaviour
             return;
         }
 
-        if (ControlMode != PlayerControlMode.Platformer || IsEliminated || IsStunned)
+        if (ControlMode != PlayerControlMode.Platformer || IsEliminated)
         {
             NetHorizontal = 0f;
             return;
@@ -258,7 +270,6 @@ public class PlayerController : NetworkBehaviour
         Score = 0;
         Heat = 0f;
         IsEliminated = false;
-        IsStunned = false;
         IsReady = false;
         _grounded = true;
         _verticalVelocity = 0f;
@@ -280,7 +291,6 @@ public class PlayerController : NetworkBehaviour
         Heat = 0f;
         IsReady = false;
         IsEliminated = false;
-        IsStunned = false;
         _grounded = true;
         _verticalVelocity = 0f;
         NetGrounded = true;
@@ -371,7 +381,7 @@ public class PlayerController : NetworkBehaviour
         }
 
         IsEliminated = true;
-        GameFeedback.WorldPopup(transform.position + Vector3.up, "OUT", new Color(1f, 0.4f, 0.35f));
+        EmitFx(PlayerFx.Out);
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
@@ -386,49 +396,8 @@ public class PlayerController : NetworkBehaviour
         if (!IsEliminated)
         {
             IsEliminated = true;
-            GameFeedback.WorldPopup(transform.position + Vector3.up, "OUT", new Color(1f, 0.4f, 0.35f));
+            EmitFx(PlayerFx.Out);
         }
-    }
-
-    public void ApplyStun(float seconds, PlayerRef effectAuthority)
-    {
-        seconds = Mathf.Clamp(seconds, 0f, 5f);
-        if (seconds <= 0f || IsEliminated || !IsValidBananaEffectAuthority(effectAuthority))
-        {
-            return;
-        }
-
-        if (!Object.HasStateAuthority)
-        {
-            RPC_ApplyStun(seconds, effectAuthority);
-            return;
-        }
-
-        ApplyStunOnAuthority(seconds);
-    }
-
-    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-    public void RPC_ApplyStun(float seconds, PlayerRef effectAuthority, RpcInfo info = default)
-    {
-        if (info.Source != effectAuthority || !IsValidBananaEffectAuthority(effectAuthority))
-        {
-            return;
-        }
-
-        seconds = Mathf.Clamp(seconds, 0f, 5f);
-        if (seconds <= 0f || IsEliminated)
-        {
-            return;
-        }
-
-        ApplyStunOnAuthority(seconds);
-    }
-
-    private void ApplyStunOnAuthority(float seconds)
-    {
-        IsStunned = true;
-        StunUntil = Runner.SimulationTime + seconds;
-        GameFeedback.WorldPopup(transform.position + Vector3.up, "STUN", new Color(1f, 0.85f, 0.3f));
     }
 
     public void ReceiveBananaHit(int points, PlayerRef effectAuthority)
@@ -469,11 +438,7 @@ public class PlayerController : NetworkBehaviour
         MatchConfig rules = LiveConfig.Match;
         int previous = Score;
         Score = Mathf.Max(0, Score + points);
-        Color color = points >= rules.BananaGreenPoints
-            ? new Color(0.35f, 1f, 0.4f)
-            : points >= 0 ? new Color(1f, 0.9f, 0.2f) : new Color(1f, 0.35f, 0.25f);
-        string label = points >= 0 ? $"+{points}" : points.ToString();
-        GameFeedback.WorldPopup(transform.position + Vector3.up * 1.1f, label, color);
+        EmitFx(PlayerFx.BananaPoints, points);
 
         if (previous < rules.BananaTargetScore && Score >= rules.BananaTargetScore)
         {
@@ -507,6 +472,7 @@ public class PlayerController : NetworkBehaviour
         IsReady = ready;
         GameFeedback.Toast(ready ? "Estas LISTO" : "Cancelaste el ready",
             ready ? new Color(0.55f, 1f, 0.6f) : new Color(1f, 0.45f, 0.4f));
+        GameSfx.Play(ready ? Sfx.Ready : Sfx.Unready);
     }
 
     public void RequestToggleReady()
@@ -605,7 +571,7 @@ public class PlayerController : NetworkBehaviour
                 Score += 1;
             }
 
-            GameFeedback.WorldPopup(transform.position + Vector3.up, "PUM", new Color(1f, 0.55f, 0.35f));
+            EmitFx(PlayerFx.ChestPunch);
         }
 
         if (Heat >= 1f)
@@ -642,7 +608,12 @@ public class PlayerController : NetworkBehaviour
             return;
         }
 
+        bool progress = score > Score && (manager.SelectedGame == MiniGameId.TreeChop || manager.SelectedGame == MiniGameId.MemoryPuzzle);
         Score = score;
+        if (progress)
+        {
+            EmitFx(PlayerFx.Progress, score);
+        }
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
@@ -746,12 +717,137 @@ public class PlayerController : NetworkBehaviour
         {
             color = Color.Lerp(color, new Color(1f, 0.15f, 0.1f), Mathf.Clamp01((Heat - 0.15f) / 0.85f));
         }
-        else if (IsStunned)
+
+        float flashLeft = _flashUntil - Time.time;
+        if (flashLeft > 0f)
         {
-            color = Color.Lerp(color, new Color(1f, 0.95f, 0.35f), 0.55f);
+            var flash = new Color(_flashColor.r, _flashColor.g, _flashColor.b, color.a);
+            color = Color.Lerp(color, flash, 0.7f * Mathf.Clamp01(flashLeft / _flashLength));
         }
 
         _spriteRenderer.color = color;
+    }
+
+    // Solo la autoridad de estado llama a esto.
+    private void EmitFx(PlayerFx kind, int value = 0)
+    {
+        FxKind = kind;
+        FxValue = value;
+        FxSeq++;
+    }
+
+    private void PollFx()
+    {
+        if (FxSeq == _seenFxSeq)
+        {
+            return;
+        }
+
+        _seenFxSeq = FxSeq;
+        PlayFx(FxKind, FxValue);
+    }
+
+    private void PlayFx(PlayerFx kind, int value)
+    {
+        bool mine = Object.HasInputAuthority;
+        Vector3 head = transform.position + Vector3.up;
+
+        switch (kind)
+        {
+            case PlayerFx.BananaPoints:
+            {
+                bool green = value >= LiveConfig.Match.BananaGreenPoints;
+                Color color = green
+                    ? new Color(0.35f, 1f, 0.4f)
+                    : value >= 0 ? new Color(1f, 0.9f, 0.2f) : new Color(1f, 0.35f, 0.25f);
+                GameFeedback.WorldPopup(head + Vector3.up * 0.1f, value >= 0 ? $"+{value}" : value.ToString(), color);
+                Flash(color, 0.22f);
+                GameSfx.Play(value < 0 ? Sfx.Explosion : green ? Sfx.PickupGreen : Sfx.Pickup, mine ? 1f : 0.4f);
+                break;
+            }
+            case PlayerFx.Out:
+                GameFeedback.WorldPopup(head, "OUT", new Color(1f, 0.4f, 0.35f));
+                Flash(new Color(1f, 0.25f, 0.2f), 0.4f);
+                GameSfx.Play(Sfx.Out, mine ? 1f : 0.6f);
+                break;
+            case PlayerFx.ChestPunch:
+                Flash(new Color(1f, 0.55f, 0.35f), 0.12f);
+                if (mine)
+                {
+                    GameFeedback.WorldPopup(head, "PUM", new Color(1f, 0.55f, 0.35f));
+                }
+
+                PlayThrottled(Sfx.Thump, mine, mine ? 0.9f : 0.3f);
+                break;
+            case PlayerFx.Progress:
+            {
+                Flash(Color.white, 0.12f);
+                if (mine)
+                {
+                    GameFeedback.WorldPopup(head, "+1", new Color(0.6f, 1f, 0.5f));
+                }
+
+                BananaGameManager manager = BananaGameManager.Instance;
+                bool memory = manager != null && manager.SelectedGame == MiniGameId.MemoryPuzzle;
+                PlayThrottled(memory ? Sfx.Match : Sfx.Chop, mine, mine ? 0.8f : 0.3f);
+                break;
+            }
+        }
+    }
+
+    private void Flash(Color color, float seconds)
+    {
+        _flashColor = color;
+        _flashLength = seconds;
+        _flashUntil = Time.time + seconds;
+    }
+
+    // Los golpes de otros jugadores pueden ser decenas por segundo; sin limite tapan todo.
+    private void PlayThrottled(Sfx sfx, bool mine, float gain)
+    {
+        if (!mine)
+        {
+            if (Time.unscaledTime - _lastRemoteSfxAt < 0.12f)
+            {
+                return;
+            }
+
+            _lastRemoteSfxAt = Time.unscaledTime;
+        }
+
+        GameSfx.Play(sfx, gain);
+    }
+
+    // Saltar y caerse del borde ponen NetGrounded en falso; solo suena si ademas se despega hacia arriba.
+    private void UpdateJumpSound()
+    {
+        bool grounded = NetGrounded;
+        float y = transform.position.y;
+
+        if (grounded)
+        {
+            _groundedY = y;
+            _airborneSince = -1f;
+        }
+        else if (_wasGrounded)
+        {
+            _airborneSince = Time.time;
+        }
+
+        if (_airborneSince >= 0f)
+        {
+            if (y > _groundedY + 0.03f && !IsEliminated)
+            {
+                GameSfx.Play(Sfx.Jump, Object.HasInputAuthority ? 0.7f : 0.25f);
+                _airborneSince = -1f;
+            }
+            else if (Time.time - _airborneSince > 0.15f)
+            {
+                _airborneSince = -1f;
+            }
+        }
+
+        _wasGrounded = grounded;
     }
 
     private void UpdateFacingAndAnimator()

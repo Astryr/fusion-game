@@ -31,6 +31,8 @@ public class GameHUDController : MonoBehaviour
     private Text _rankingText;
     private Button _backToLobbyButton;
     private float _endScreenShownAt = -1f;
+    private int _lastCountdownSecond = -1;
+    private MatchPhase _lastPhase = MatchPhase.Lobby;
 
     private GameObject _chestPanel;
     private Image _heatFill;
@@ -366,13 +368,32 @@ public class GameHUDController : MonoBehaviour
             return;
         }
 
-        if (manager.Phase == MatchPhase.Countdown)
+        MatchPhase phase = manager.Phase;
+        if (phase == MatchPhase.Playing && _lastPhase == MatchPhase.Countdown)
+        {
+            GameSfx.Play(Sfx.Go);
+        }
+
+        _lastPhase = phase;
+
+        if (phase == MatchPhase.Countdown)
         {
             int seconds = Mathf.CeilToInt(manager.CountdownRemaining);
             _bannerText.text = seconds > 0 ? seconds.ToString() : "YA";
             _banner.SetActive(true);
+            if (seconds != _lastCountdownSecond)
+            {
+                _lastCountdownSecond = seconds;
+                if (seconds > 0)
+                {
+                    GameSfx.Play(Sfx.Tick);
+                }
+            }
+
             return;
         }
+
+        _lastCountdownSecond = -1;
 
         if (manager.Phase == MatchPhase.Playing)
         {
@@ -420,6 +441,10 @@ public class GameHUDController : MonoBehaviour
         if (_endScreenShownAt < 0f)
         {
             _endScreenShownAt = Time.unscaledTime;
+            PlayerController local = PlayerController.Local;
+            bool won = !manager.SoloDefeat && local != null && local.IsSpawned &&
+                       local.DisplayName == manager.WinnerName.ToString();
+            GameSfx.Play(won ? Sfx.Win : Sfx.Lose);
         }
 
         string winner = manager.WinnerName.ToString();

@@ -2,7 +2,36 @@ using UnityEngine;
 
 public class GameAudio : MonoBehaviour
 {
+    private const string VolumePref = "br.music";
+    private const float DefaultVolume = 0.5f;
+    private const float MaxGain = 0.9f;
+
+    private static float _musicVolume = -1f;
+
     public static GameAudio Instance { get; private set; }
+
+    public static float MusicVolume
+    {
+        get
+        {
+            if (_musicVolume < 0f)
+            {
+                _musicVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(VolumePref, DefaultVolume));
+            }
+
+            return _musicVolume;
+        }
+        set
+        {
+            _musicVolume = Mathf.Clamp01(value);
+            PlayerPrefs.SetFloat(VolumePref, _musicVolume);
+            PlayerPrefs.Save();
+            if (Instance != null && Instance._source != null)
+            {
+                Instance._source.volume = _musicVolume * MaxGain;
+            }
+        }
+    }
 
     private AudioSource _source;
     private AudioClip _menuClip;
@@ -57,7 +86,7 @@ public class GameAudio : MonoBehaviour
         _source.loop = true;
         _source.playOnAwake = false;
         _source.spatialBlend = 0f;
-        _source.volume = 0.45f;
+        _source.volume = MusicVolume * MaxGain;
         _menuClip = Resources.Load<AudioClip>("Audio/MainMenuSong");
         _minigameClip = Resources.Load<AudioClip>("Audio/MinigamesSong");
     }

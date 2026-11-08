@@ -18,6 +18,7 @@ public class MainMenuController : MonoBehaviour
     private Button _refreshButton;
     private RectTransform _sessionListContent;
     private RankingPanel _rankingPanel;
+    private SettingsPanel _settingsPanel;
     private Text _cloudStatusText;
     private GameObject _motdBox;
     private Text _motdText;
@@ -100,6 +101,7 @@ public class MainMenuController : MonoBehaviour
         BuildCreatePanel(canvas.transform);
         BuildBrowserPanel(canvas.transform);
         BuildRankingEntry(canvas.transform);
+        BuildFooterButtons(canvas.transform);
 
         _statusText = UIFactory.CreateText(canvas.transform, string.Empty, 20, TextAnchor.MiddleCenter, new Color(1f, 0.65f, 0.65f));
         _statusText.fontStyle = FontStyle.Bold;
@@ -119,6 +121,8 @@ public class MainMenuController : MonoBehaviour
 
         BuildLiveInfo(canvas.transform);
         _rankingPanel = RankingPanel.Create(canvas.transform);
+        _settingsPanel = SettingsPanel.Create(canvas.transform);
+        GameSfx.Warmup();
 
         RefreshHint();
         ShowRooms(new List<RoomRow>());
@@ -194,6 +198,28 @@ public class MainMenuController : MonoBehaviour
         outline.effectDistance = new Vector2(1.2f, -1.2f);
         UIFactory.SetRect(_cloudStatusText.rectTransform, anchor, anchor, new Vector2(380f, -106f), new Vector2(630f, -82f));
         RefreshCloudStatus();
+    }
+
+    private void BuildFooterButtons(Transform parent)
+    {
+        var corner = new Vector2(1f, 0f);
+
+        Button settings = UIStyle.CreateButton(parent, "AJUSTES", UIStyle.Info, 22, 12, 4f);
+        UIFactory.SetRect(settings.GetComponent<RectTransform>(), corner, corner, new Vector2(-272f, 34f), new Vector2(-142f, 78f));
+        settings.onClick.AddListener(() => _settingsPanel.Open());
+
+        Button quit = UIStyle.CreateButton(parent, "SALIR", UIStyle.Danger, 22, 12, 4f);
+        UIFactory.SetRect(quit.GetComponent<RectTransform>(), corner, corner, new Vector2(-130f, 34f), new Vector2(-14f, 78f));
+        quit.onClick.AddListener(QuitGame);
+    }
+
+    private static void QuitGame()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
     }
 
     public void OpenRanking()

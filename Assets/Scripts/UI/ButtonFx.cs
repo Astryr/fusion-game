@@ -58,6 +58,7 @@ public class ButtonFx : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 
         _down = true;
         SetFaceOffset(3f);
+        GameSfx.Play(Sfx.Click);
     }
 
     public void OnPointerUp(PointerEventData eventData)

@@ -367,9 +367,32 @@ Para cambiar un valor: editá el `.rc` (o la clave en el dashboard), subí
 cuando su sala vuelve al lobby. La lista de claves, tipos y rangos está en el
 `README.md`.
 
+---
+
+## H. Generar el build final
+
+La entrega lleva las carpetas `Assets`, `Packages` y `ProjectSettings`, el build y
+el documento de optimización (`NETWORK_TESTING.md`).
+
+1. **Edit > Project Settings > Player**: Product Name `Banana Rush` y Company
+   `Banana Rush Team` ya están cargados. En **Icon > Default Icon** elegí
+   `Assets/Resources/Menu/BananaCupEmblem` (es el ícono del `.exe`).
+2. **File > Build Profiles**, lista de escenas: tienen que estar solo
+   `Scenes/MainMenu` y `Scenes/Game`, en ese orden (las escenas demo de Photon ya
+   no están). Plataforma Windows, x86_64, sin *Development Build*.
+3. **Build** en una carpeta fuera del proyecto. Salen `Banana Rush.exe` y la
+   carpeta `Banana Rush_Data`: se entregan juntas, comprimidas.
+4. Probalo antes de entregar: abrí dos instancias del `.exe` (con **Alt+Enter**
+   cada una pasa a ventana para verlas juntas), creá una sala en una y unite desde
+   la otra, y jugá un minijuego completo. **F3** muestra el panel de red.
+5. La PC que lo ejecute necesita internet: Photon, el ranking y Remote Config
+   dependen de la red.
+6. Antes de entregar: reseteá el ranking (sección F) y confirmá que la config está
+   publicada (sección G).
+
 ## Temario cubierto
 
-- **JR6**: propiedades `[Networked]` (fase, puntaje, ready, stun) e
-  interacciones por RPC (ready, consume de bananas, stun).
+- **JR6**: propiedades `[Networked]` (fase, puntaje, ready, eliminado) e
+  interacciones por RPC (ready, consume de bananas).
 - **JR7**: crear sala, listar salas abiertas (`JoinSessionLobby` +
   `OnSessionListUpdated`) y property de sesion con el minijuego elegido.

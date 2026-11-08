@@ -278,7 +278,7 @@ public class BananaGameManager : NetworkBehaviour
 
         if (winner != null)
         {
-            RPC_DeclareWinner(winner.Object.InputAuthority, detail);
+            RPC_DeclareWinner(winner.Object.InputAuthority);
         }
     }
 
@@ -304,7 +304,7 @@ public class BananaGameManager : NetworkBehaviour
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-    public void RPC_DeclareWinner(PlayerRef player, string detail, RpcInfo info = default)
+    public void RPC_DeclareWinner(PlayerRef player, RpcInfo info = default)
     {
         if (Phase != MatchPhase.Playing || info.Source != player)
         {
@@ -326,7 +326,19 @@ public class BananaGameManager : NetworkBehaviour
             return;
         }
 
-        FinishMatch(winner, detail);
+        FinishMatch(winner, WinDetail(SelectedGame));
+    }
+
+    // El texto de victoria lo decide la autoridad: lo que mande un cliente nunca se muestra a los demas.
+    private string WinDetail(MiniGameId game)
+    {
+        return game switch
+        {
+            MiniGameId.BananaRain => $"{Config.BananaTargetScore} puntos",
+            MiniGameId.TreeChop => "rompio el arbol",
+            MiniGameId.ChestBeat => "el mas fuerte",
+            _ => string.Empty,
+        };
     }
 
     private bool IsValidWinnerClaim(PlayerController candidate)

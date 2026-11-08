@@ -508,6 +508,7 @@ public class LogSurviveMinigame : MonoBehaviour, IMiniGame
         if (_rockVisual.gameObject.activeSelf != active)
         {
             _rockVisual.gameObject.SetActive(active);
+            GameSfx.Play(active ? Sfx.Whoosh : Sfx.Crash, active ? 0.5f : 0.7f);
         }
 
         if (active)

@@ -12,8 +12,6 @@ public class BananaController : NetworkBehaviour
     [SerializeField] private float _fallSpeed = 4f;
 
     [Networked] private NetworkBool Consumed { get; set; }
-    [Networked] private NetworkBool IsStunPeel { get; set; }
-    [Networked] private float StunSeconds { get; set; }
     [Networked] private int NetPointValue { get; set; }
 
     public override void Spawned()
@@ -51,13 +49,6 @@ public class BananaController : NetworkBehaviour
         }
     }
 
-    public void BecomeStunPeel(float stunSeconds)
-    {
-        IsStunPeel = true;
-        StunSeconds = stunSeconds;
-        _pointValue = 0;
-    }
-
     public override void FixedUpdateNetwork()
     {
         if (!Object.HasStateAuthority || Consumed)
@@ -78,7 +69,8 @@ public class BananaController : NetworkBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (Consumed)
+        // El trigger puede dispararse antes de Spawned o despues de Despawn, donde leer una propiedad [Networked] tira excepcion.
+        if (Object == null || !Object.IsValid || Consumed)
         {
             return;
         }
@@ -96,7 +88,7 @@ public class BananaController : NetworkBehaviour
 
     private void RequestConsume(PlayerRef claimant)
     {
-        if (Object == null || Consumed)
+        if (Object == null || !Object.IsValid || Consumed)
         {
             return;
         }
@@ -137,20 +129,10 @@ public class BananaController : NetworkBehaviour
         }
 
         PlayerRef bananaAuthority = Object.StateAuthority;
-        bool stunPeel = IsStunPeel;
         int points = NetPointValue != 0 ? NetPointValue : _pointValue;
-        float stunSeconds = StunSeconds > 0f ? StunSeconds : 3f;
         Consumed = true;
 
-        if (stunPeel)
-        {
-            player.ApplyStun(stunSeconds, bananaAuthority);
-        }
-        else
-        {
-            player.ReceiveBananaHit(points, bananaAuthority);
-        }
-
+        player.ReceiveBananaHit(points, bananaAuthority);
         Runner.Despawn(Object);
     }
 

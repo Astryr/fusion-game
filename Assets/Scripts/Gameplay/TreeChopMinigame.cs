@@ -165,9 +165,9 @@ public class TreeChopMinigame : MonoBehaviour, IMiniGame
         PlayerController.Local.RPC_SetScore(next);
         Color color = delta >= 0 ? new Color(0.6f, 1f, 0.5f) : new Color(1f, 0.45f, 0.4f);
         GameFeedback.Toast($"{reason}  ({next}/{Target})", color);
-        if (delta > 0)
+        if (delta < 0)
         {
-            GameFeedback.WorldPopup(PlayerController.Local.transform.position + Vector3.up, "+1", color);
+            GameSfx.Play(Sfx.Mismatch, 0.8f);
         }
     }
 

@@ -41,7 +41,12 @@ pantalla de victoria → volver al lobby.
 - Al terminar se ven puestos y puntos de Copa (4-3-2-1). Desde ahi se
   vuelve al lobby para otra ronda.
 - El menu tiene un boton **RANKING** con el top 10 global de puntos de
-  Copa (ver [Ranking online](#ranking-online-unity-gaming-services)).
+  Copa (ver [Ranking online](#ranking-online-unity-gaming-services)),
+  **AJUSTES** (volumen de musica y de efectos, controles y panel de red) y
+  **SALIR**.
+- **F3** muestra u oculta el panel de red (RTT, trafico, config). Arranca
+  oculto. Las pruebas y las optimizaciones estan en
+  [`NETWORK_TESTING.md`](./NETWORK_TESTING.md).
 
 ## Stack
 
@@ -62,15 +67,20 @@ pantalla de victoria → volver al lobby.
 - Ready check por RPC. No arranca hasta que todos estan listos.
 - 6 minijuegos. Director de partida con fases lobby / countdown /
   playing / results.
-- Input de Fusion, State/Input Authority por jugador, bananas y cascaras
-  en red.
+- Input de Fusion, State/Input Authority por jugador y bananas en red.
 - Chat de texto por RPC (`PlayerController.RPC_Chat`): el remitente sale
   del `InputAuthority` del objeto, el texto se sanea al enviar y al recibir.
 - Menu principal con arte (fondo, logo de la Copa Banana, monos y bananas
   animados) y lobby estilo "tarjetas de jugador".
 - Nombres sobre la cabeza (unicos: si hay repetidos se agrega un numero),
   toasts, popups, pantalla de victoria.
-- Musica de menu/lobby y de minijuegos.
+- Musica de menu/lobby y de minijuegos, y efectos de sonido sintetizados
+  por codigo (`GameSfx`): bananas, salto, eliminacion, cuenta atras,
+  victoria y derrota, chat y botones. No hay archivos de audio extra.
+- Los efectos de un jugador (popup de puntos, OUT, golpes, destello de
+  color y sonido) los ven todos: la autoridad sube un contador
+  `[Networked]` por jugador y cada cliente reproduce el efecto
+  (`PlayerController.PollFx`).
 - Desconexion a mitad de partida: si queda un jugador, gana. Si te
   desconectan, el menu te avisa el motivo.
 - Ranking online con Unity Gaming Services: login anonimo, suma de puntos
@@ -182,7 +192,7 @@ Assets/
     MainMenu.unity
     Game.unity
   Scripts/
-    Core/         Conexion, input, config, audio, chat (GameChat)
+    Core/         Conexion, input, config, audio y efectos (GameAudio, GameSfx), chat (GameChat)
     Services/     Unity Gaming Services: login anonimo, ranking online y Remote Config
     Player/       Movimiento, ready, nickname, puntaje
     Gameplay/     Director + 6 minijuegos

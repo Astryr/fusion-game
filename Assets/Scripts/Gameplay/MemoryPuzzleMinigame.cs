@@ -200,6 +200,7 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
             return;
         }
 
+        GameSfx.Play(Sfx.Flip);
         if (_flipA < 0)
         {
             _flipA = index;
@@ -233,6 +234,7 @@ public class MemoryPuzzleMinigame : MonoBehaviour, IMiniGame
         else
         {
             _mismatchUntil = Time.unscaledTime + MismatchSeconds;
+            GameSfx.Play(Sfx.Mismatch, 0.7f);
         }
 
         RefreshCells();

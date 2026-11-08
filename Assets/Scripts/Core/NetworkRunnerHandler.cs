@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Fusion;
 using Fusion.Sockets;
+using Fusion.Statistics;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -64,9 +65,29 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
     private float _rttSampleTimer;
     private float _previousRttMs = -1f;
     private float _rttJitterMs;
-    private bool _showNetworkDiagnostics = true;
+    private bool _showNetworkDiagnostics;
     private GUIStyle _networkDiagnosticsStyle;
+    private float _trafficWindow;
+    private float _trafficInBytes;
+    private float _trafficOutBytes;
+    private float _trafficInPackets;
+    private float _trafficOutPackets;
+    private bool _trafficUnavailable;
+    private const string TrafficWaiting = "Trafico: esperando muestras (solo con la DLL Debug de Fusion)";
+    private string _trafficLine = TrafficWaiting;
 #endif
+    private float _connectedAt;
+
+    public bool ShowDiagnostics
+    {
+#if UNITY_EDITOR || UNITY_STANDALONE_WIN
+        get => _showNetworkDiagnostics;
+        set => _showNetworkDiagnostics = value;
+#else
+        get => false;
+        set { }
+#endif
+    }
 
     public string ConsumeDisconnectMessage()
     {
@@ -280,6 +301,7 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         {
             CurrentSessionName = Runner.SessionInfo != null ? Runner.SessionInfo.Name : sessionName;
             IsConnected = true;
+            _connectedAt = Time.unscaledTime;
             OnConnectedEvent?.Invoke();
             return true;
         }
@@ -313,6 +335,52 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         _rttSampleTimer = 0f;
         _previousRttMs = -1f;
         _rttJitterMs = 0f;
+        _trafficWindow = 0f;
+        _trafficInBytes = 0f;
+        _trafficOutBytes = 0f;
+        _trafficInPackets = 0f;
+        _trafficOutPackets = 0f;
+        _trafficLine = TrafficWaiting;
+    }
+
+    // Fusion deja las estadisticas de cada ciclo de actualizacion en un snapshot; se suman y se pasan a "por segundo".
+    // Solo hay datos con la DLL de Fusion en modo Debug.
+    private void SampleTraffic()
+    {
+        if (_trafficUnavailable || !Runner.TryGetFusionStatistics(out FusionStatisticsManager manager) || manager == null)
+        {
+            return;
+        }
+
+        try
+        {
+            var values = manager.SimulationSnapshot.Stats;
+            _trafficInBytes += values.GetValueOrDefault(FusionStatType.InBandwidth, 0f);
+            _trafficOutBytes += values.GetValueOrDefault(FusionStatType.OutBandwidth, 0f);
+            _trafficInPackets += values.GetValueOrDefault(FusionStatType.InPackets, 0f);
+            _trafficOutPackets += values.GetValueOrDefault(FusionStatType.OutPackets, 0f);
+        }
+        catch (Exception)
+        {
+            _trafficUnavailable = true;
+            _trafficLine = "Trafico: no disponible (hace falta la DLL Debug de Fusion)";
+            return;
+        }
+
+        _trafficWindow += Time.unscaledDeltaTime;
+        if (_trafficWindow < 1f)
+        {
+            return;
+        }
+
+        float perSecond = 1f / _trafficWindow;
+        _trafficLine = $"Trafico: entra {_trafficInBytes * perSecond / 1024f:0.0} KB/s ({_trafficInPackets * perSecond:0} paq/s)" +
+                       $" | sale {_trafficOutBytes * perSecond / 1024f:0.0} KB/s ({_trafficOutPackets * perSecond:0} paq/s)";
+        _trafficWindow = 0f;
+        _trafficInBytes = 0f;
+        _trafficOutBytes = 0f;
+        _trafficInPackets = 0f;
+        _trafficOutPackets = 0f;
     }
 
     private void UpdateNetworkDiagnostics()
@@ -321,6 +389,8 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         {
             return;
         }
+
+        SampleTraffic();
 
         _rttSampleTimer -= Time.unscaledDeltaTime;
         if (_rttSampleTimer > 0f)
@@ -372,6 +442,7 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
             ? BananaGameManager.Instance.FeedbackRpcCount
             : 0;
         stats += $"\nRPC de feedback recibidos: {feedbackRpcCount}";
+        stats += $"\n{_trafficLine}";
         stats += $"\nConfig: {LiveConfig.SourceLabel} r{LiveConfig.Local.Revision}{HostConfigNote()}";
         if (_networkDiagnosticsStyle == null)
         {
@@ -385,12 +456,12 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
             };
         }
 
-        Rect panel = new Rect(12f, 12f, 520f, 128f);
+        Rect panel = new Rect(12f, 12f, 640f, 152f);
         Color previousColor = GUI.color;
         GUI.color = new Color(0.035f, 0.055f, 0.075f, 0.96f);
         GUI.Box(panel, GUIContent.none);
         GUI.color = previousColor;
-        GUI.Label(new Rect(24f, 18f, 496f, 116f), $"RED - DIAGNOSTICO (F3)\n{stats}", _networkDiagnosticsStyle);
+        GUI.Label(new Rect(24f, 18f, 616f, 140f), $"RED - DIAGNOSTICO (F3)\n{stats}", _networkDiagnosticsStyle);
     }
 
     private static string HostConfigNote()
@@ -494,6 +565,10 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
 
             TrySpawnGameManager(runner);
         }
+        else if (player != runner.LocalPlayer && IsConnected && Time.unscaledTime - _connectedAt > 1.5f)
+        {
+            GameSfx.Play(Sfx.Join, 0.8f);
+        }
 
         OnPlayerCountChangedEvent?.Invoke(runner.SessionInfo != null ? runner.SessionInfo.PlayerCount : 0);
     }
@@ -503,6 +578,11 @@ public class NetworkRunnerHandler : MonoBehaviour, INetworkRunnerCallbacks
         if (!IsGameRunner(runner))
         {
             return;
+        }
+
+        if (player != runner.LocalPlayer && IsConnected && runner.IsRunning)
+        {
+            GameSfx.Play(Sfx.Leave, 0.8f);
         }
 
         if (_spawnedPlayers.TryGetValue(player, out NetworkObject playerObject))
