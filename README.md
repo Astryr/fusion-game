@@ -38,6 +38,8 @@ pantalla de victoria → volver al lobby.
     mirar. El primero en completar gana.
   - **Rompe el arbol**: QTE de teclas. Las rojas son trampa. Primero a 30
     golpes buenos o, a los 60s, el que mas tenga.
+  - **Gritos de primate**: escucha animales de la selva y grita con ESPACIO solo
+    cuando suene el animal indicado. El primero en sumar 5 puntos gana.
 - Al terminar se ven puestos y puntos de Copa (4-3-2-1). Desde ahi se
   vuelve al lobby para otra ronda.
 - El menu tiene un boton **RANKING** con el top 10 global de puntos de
@@ -65,7 +67,7 @@ pantalla de victoria → volver al lobby.
 - Crear sala, listar salas abiertas y unirse. Tope de 4. Property de
   sesion con el minijuego. La sala se cierra al arrancar la cuenta atras.
 - Ready check por RPC. No arranca hasta que todos estan listos.
-- 6 minijuegos. Director de partida con fases lobby / countdown /
+- 7 minijuegos. Director de partida con fases lobby / countdown /
   playing / results.
 - Input de Fusion, State/Input Authority por jugador y bananas en red.
 - Chat de texto por RPC (`PlayerController.RPC_Chat`): el remitente sale
@@ -195,7 +197,7 @@ Assets/
     Core/         Conexion, input, config, audio y efectos (GameAudio, GameSfx), chat (GameChat)
     Services/     Unity Gaming Services: login anonimo, ranking online y Remote Config
     Player/       Movimiento, ready, nickname, puntaje
-    Gameplay/     Director + 6 minijuegos
+    Gameplay/     Director + 7 minijuegos
     UI/           Menu, lobby, chat, HUD, UIStyle/UIFactory
   Sprites/
   Animations/Player/

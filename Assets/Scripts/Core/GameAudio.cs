@@ -7,6 +7,7 @@ public class GameAudio : MonoBehaviour
     private const float MaxGain = 0.9f;
 
     private static float _musicVolume = -1f;
+    private static float _musicVolumeScale = 1f;
 
     public static GameAudio Instance { get; private set; }
 
@@ -28,7 +29,7 @@ public class GameAudio : MonoBehaviour
             PlayerPrefs.Save();
             if (Instance != null && Instance._source != null)
             {
-                Instance._source.volume = _musicVolume * MaxGain;
+                Instance._source.volume = _musicVolume * MaxGain * _musicVolumeScale;
             }
         }
     }
@@ -46,6 +47,16 @@ public class GameAudio : MonoBehaviour
     public static void PlayMinigames()
     {
         Ensure().Play("minigames");
+    }
+
+    public static void SetVolumeScale(float scale)
+    {
+        _musicVolumeScale = Mathf.Clamp01(scale);
+        Ensure();
+        if (Instance._source != null)
+        {
+            Instance._source.volume = MusicVolume * MaxGain * _musicVolumeScale;
+        }
     }
 
     private static GameAudio Ensure()
@@ -86,7 +97,7 @@ public class GameAudio : MonoBehaviour
         _source.loop = true;
         _source.playOnAwake = false;
         _source.spatialBlend = 0f;
-        _source.volume = MusicVolume * MaxGain;
+        _source.volume = MusicVolume * MaxGain * _musicVolumeScale;
         _menuClip = Resources.Load<AudioClip>("Audio/MainMenuSong");
         _minigameClip = Resources.Load<AudioClip>("Audio/MinigamesSong");
     }

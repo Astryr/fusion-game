@@ -24,6 +24,18 @@ public class BananaGameManager : NetworkBehaviour
     [Networked] public float LogRockX { get; set; }
     [Networked] public float LogRockStartTime { get; set; }
     [Networked] public float LogRockSpeed { get; set; }
+    [Networked] public int PrimateTargetIndex { get; set; }
+    [Networked] public int PrimateAnimalIndex { get; set; }
+    [Networked] public int PrimateSoundId { get; set; }
+    [Networked] public int PrimateRoundId { get; set; }
+    [Networked] public NetworkBool PrimateRoundActive { get; set; }
+    [Networked] public int PrimateRoundDisqualifiedMask { get; set; }
+    [Networked] public float PrimateListenUntil { get; set; }
+    [Networked] public float PrimatePointUntil { get; set; }
+    [Networked] public float PrimateCountdownUntil { get; set; }
+    [Networked] public float PrimateResultUntil { get; set; }
+    [Networked] public NetworkBool PrimateCountdownActive { get; set; }
+    [Networked] public NetworkString<_32> PrimatePointWinner { get; set; }
     [Networked] public int RoundSeed { get; set; }
     [Networked] public int WinnerScore { get; set; }
     [Networked] public NetworkString<_32> WinnerName { get; set; }
@@ -291,6 +303,96 @@ public class BananaGameManager : NetworkBehaviour
         FinishMatch(null, detail);
     }
 
+    public void ResolvePrimateScream(PlayerRef source)
+    {
+        if (!Object.HasStateAuthority || Phase != MatchPhase.Playing || SelectedGame != MiniGameId.PrimateScreams ||
+            !PrimateRoundActive)
+        {
+            return;
+        }
+
+        PlayerController sourcePlayer = null;
+        foreach (var candidate in GetPlayers())
+        {
+            if (candidate.Object.InputAuthority == source && !candidate.IsEliminated)
+            {
+                sourcePlayer = candidate;
+                break;
+            }
+        }
+
+        if (sourcePlayer == null)
+        {
+            return;
+        }
+
+        int playerBit = 1 << (sourcePlayer.Object.InputAuthority.PlayerId & 31);
+        bool alreadyDisqualified = (PrimateRoundDisqualifiedMask & playerBit) != 0;
+        bool validAnimal = PrimateAnimalIndex == PrimateTargetIndex;
+        bool validTime = MatchTime <= PrimateListenUntil;
+
+        if (!alreadyDisqualified && validAnimal && validTime)
+        {
+            AwardPrimatePoint(sourcePlayer);
+            return;
+        }
+
+        if (!alreadyDisqualified)
+        {
+            PrimateRoundDisqualifiedMask |= playerBit;
+            sourcePlayer.PrimateRoundDisqualified = true;
+            RPC_ShowFeedback($"{sourcePlayer.DisplayName} fue descalificado", 2);
+        }
+
+        if (AllowSoloPractice)
+        {
+            BeginPrimateCountdown();
+            return;
+        }
+
+        PlayerController[] players = GetPlayers();
+        PlayerController lastActive = null;
+        int activeCount = 0;
+        foreach (var player in players)
+        {
+            if (player.IsEliminated)
+            {
+                continue;
+            }
+
+            int bit = 1 << (player.Object.InputAuthority.PlayerId & 31);
+            if ((PrimateRoundDisqualifiedMask & bit) == 0)
+            {
+                activeCount++;
+                lastActive = player;
+            }
+        }
+
+        if (activeCount == 1 && lastActive != null)
+        {
+            AwardPrimatePoint(lastActive);
+        }
+    }
+
+    private void AwardPrimatePoint(PlayerController winner)
+    {
+        int nextScore = Mathf.Clamp(winner.Score + 1, 0, 5);
+        winner.RPC_SetScore(nextScore);
+        PrimateRoundActive = false;
+        PrimatePointWinner = winner.DisplayName;
+        BeginPrimateCountdown();
+    }
+
+    private void BeginPrimateCountdown()
+    {
+        PrimateRoundActive = false;
+        PrimateAnimalIndex = -1;
+        PrimateResultUntil = MatchTime + 2.2f;
+        PrimatePointUntil = PrimateResultUntil;
+        PrimateCountdownActive = false;
+        PrimateCountdownUntil = PrimateResultUntil + 3f;
+    }
+
     public void DeclareHighestScoreWinner(string detail)
     {
         if (Phase != MatchPhase.Playing || !Object.HasStateAuthority)
@@ -335,6 +437,7 @@ public class BananaGameManager : NetworkBehaviour
             MiniGameId.BananaRain => $"{Config.BananaTargetScore} puntos",
             MiniGameId.TreeChop => "rompio el arbol",
             MiniGameId.ChestBeat => "el mas fuerte",
+            MiniGameId.PrimateScreams => "grito mas fuerte",
             _ => string.Empty,
         };
     }
@@ -347,6 +450,7 @@ public class BananaGameManager : NetworkBehaviour
             MiniGameId.MemoryPuzzle => candidate.Score >= MemoryPuzzleMinigame.PairCount,
             MiniGameId.TreeChop => candidate.Score >= Config.TreeChopTarget,
             MiniGameId.ChestBeat => candidate.Score >= Config.ChestTarget,
+            MiniGameId.PrimateScreams => candidate.Score >= 5,
             _ => false,
         };
     }
@@ -684,6 +788,7 @@ public class BananaGameManager : NetworkBehaviour
         _minigames.Add(GetOrAdd<ChestBeatMinigame>());
         _minigames.Add(GetOrAdd<MemoryPuzzleMinigame>());
         _minigames.Add(GetOrAdd<TreeChopMinigame>());
+        _minigames.Add(GetOrAdd<PrimateScreamsMinigame>());
 
         foreach (var minigame in _minigames)
         {

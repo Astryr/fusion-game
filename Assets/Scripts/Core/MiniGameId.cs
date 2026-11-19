@@ -6,6 +6,7 @@ public enum MiniGameId
     ChestBeat = 3,
     MemoryPuzzle = 4,
     TreeChop = 5,
+    PrimateScreams = 6,
 }
 
 public static class MiniGameNames
@@ -23,6 +24,7 @@ public static class MiniGameNames
         "Golpeo de pecho",
         "Memotest de la jungla",
         "Rompe el arbol",
+        "Gritos de primate",
     };
 
     public static readonly string[] ShortHints =
@@ -33,6 +35,7 @@ public static class MiniGameNames
         "Spamea ESPACIO con ritmo. Si te pasas, el pecho se pone rojo y perdes.",
         "Cada uno tiene su tablero. 9 pares. 7s para mirar. El primero en completar gana.",
         "Apreta la tecla que aparece. Las rojas son trampa. Primero a 30 gana.",
+        "Escucha la selva. Grita con ESPACIO solo cuando anuncie al animal correcto. Primero a 5 gana.",
     };
 
     public static string Display(MiniGameId id)
@@ -53,6 +56,8 @@ public static class MiniGameNames
                 return $"Cada uno tiene su tablero. 9 pares. {rules.MemotestPeekSeconds:0.#}s para mirar. El primero en completar gana.";
             case MiniGameId.TreeChop:
                 return $"Apreta la tecla que aparece. Las rojas son trampa. Primero a {rules.TreeChopTarget} gana.";
+            case MiniGameId.PrimateScreams:
+                return "Escucha la selva. Grita con ESPACIO solo cuando anuncie al animal correcto. Primero a 5 gana.";
         }
 
         int index = (int)id;
@@ -61,7 +66,7 @@ public static class MiniGameNames
 
     public static MiniGameId Clamp(int raw)
     {
-        if (raw < 0 || raw > (int)MiniGameId.TreeChop)
+        if (raw < 0 || raw > (int)MiniGameId.PrimateScreams)
         {
             return MiniGameId.BananaRain;
         }
@@ -83,4 +88,5 @@ public enum PlayerControlMode
     Disabled = 0,
     Platformer = 1,
     ChestBeat = 2,
+    PrimateScreams = 3,
 }

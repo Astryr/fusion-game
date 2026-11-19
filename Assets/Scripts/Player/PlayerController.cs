@@ -22,6 +22,7 @@ public class PlayerController : NetworkBehaviour
     [Networked] public NetworkString<_32> Nickname { get; set; }
     [Networked] public NetworkBool IsReady { get; set; }
     [Networked] public NetworkBool IsEliminated { get; set; }
+    [Networked] public NetworkBool PrimateRoundDisqualified { get; set; }
     [Networked] public float Heat { get; set; }
 
     [Networked] private int FxSeq { get; set; }
@@ -201,6 +202,18 @@ public class PlayerController : NetworkBehaviour
         bool actionPressed = input.Buttons.WasPressed(_previousButtons, InputButton.Action);
         _previousButtons = input.Buttons;
 
+        if (ControlMode == PlayerControlMode.PrimateScreams)
+        {
+            if (!IsEliminated && !PrimateRoundDisqualified && jumpPressed)
+            {
+                RPC_PlayPrimateScream();
+                RPC_RequestPrimateScream();
+            }
+
+            NetHorizontal = 0f;
+            return;
+        }
+
         if (ControlMode == PlayerControlMode.ChestBeat)
         {
             if (!IsEliminated)
@@ -267,6 +280,7 @@ public class PlayerController : NetworkBehaviour
         Score = 0;
         Heat = 0f;
         IsEliminated = false;
+        PrimateRoundDisqualified = false;
         IsReady = false;
         _grounded = true;
         _verticalVelocity = 0f;
@@ -288,6 +302,7 @@ public class PlayerController : NetworkBehaviour
         Heat = 0f;
         IsReady = false;
         IsEliminated = false;
+        PrimateRoundDisqualified = false;
         _grounded = true;
         _verticalVelocity = 0f;
         NetGrounded = true;
@@ -482,6 +497,36 @@ public class PlayerController : NetworkBehaviour
         RPC_SetReady(!IsReady);
     }
 
+    [Rpc(RpcSources.InputAuthority, RpcTargets.All)]
+    public void RPC_PlayPrimateScream(RpcInfo info = default)
+    {
+        AudioClip clip = Resources.Load<AudioClip>("Sounds/MONO");
+        if (clip == null)
+        {
+            return;
+        }
+
+        var source = GetComponent<AudioSource>();
+        if (source == null)
+        {
+            source = gameObject.AddComponent<AudioSource>();
+            source.spatialBlend = 0f;
+            source.playOnAwake = false;
+        }
+        source.PlayOneShot(clip, 1f);
+    }
+
+    [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
+    public void RPC_RequestPrimateScream(RpcInfo info = default)
+    {
+        if (BananaGameManager.Instance == null)
+        {
+            return;
+        }
+
+        BananaGameManager.Instance.ResolvePrimateScream(info.Source);
+    }
+
     public void SendChat(string text)
     {
         if (!IsSpawned || !Object.HasInputAuthority)
@@ -593,9 +638,18 @@ public class PlayerController : NetworkBehaviour
 
         bool managerParkourScore = manager.SelectedGame == MiniGameId.Parkour &&
                                    info.Source == manager.Object.StateAuthority;
+        bool managerPrimateScore = manager.SelectedGame == MiniGameId.PrimateScreams &&
+                                   info.Source == manager.Object.StateAuthority;
         if (managerParkourScore)
         {
             if (score < 10 || score > 110)
+            {
+                return;
+            }
+        }
+        else if (managerPrimateScore)
+        {
+            if (score != Mathf.Clamp(Score + 1, 0, 5))
             {
                 return;
             }
@@ -605,7 +659,9 @@ public class PlayerController : NetworkBehaviour
             return;
         }
 
-        bool progress = score > Score && (manager.SelectedGame == MiniGameId.TreeChop || manager.SelectedGame == MiniGameId.MemoryPuzzle);
+        bool progress = score > Score && (manager.SelectedGame == MiniGameId.TreeChop ||
+                                          manager.SelectedGame == MiniGameId.MemoryPuzzle ||
+                                          manager.SelectedGame == MiniGameId.PrimateScreams);
         Score = score;
         if (progress)
         {
@@ -631,6 +687,7 @@ public class PlayerController : NetworkBehaviour
         {
             MiniGameId.MemoryPuzzle => score >= Score && score <= Score + 1 && score <= MemoryPuzzleMinigame.PairCount,
             MiniGameId.TreeChop => score <= LiveConfig.Match.TreeChopTarget && Mathf.Abs(score - Score) <= 1,
+            MiniGameId.PrimateScreams => score >= Score && score <= Score + 1 && score <= 5,
             _ => false,
         };
     }
