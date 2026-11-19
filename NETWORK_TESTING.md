@@ -44,7 +44,7 @@ No se implementa migración de host propia: no hace falta en Shared Mode, Photon
 
 ### 3.2 Prueba previa con bots
 
-Antes de medir con personas, usar bots o instancias controladas para comprobar conectividad, desconexiones y errores básicos. Esta fase usa condiciones menos exigentes y se limita a encontrar fallos técnicos:
+Antes de medir con personas, usamos bots o instancias controladas para comprobar conectividad, desconexiones y errores básicos. Esta fase usa condiciones menos exigentes y se limita a encontrar fallos técnicos:
 
 - Normal: 75 ms de RTT objetivo, sin pérdida, 60 FPS.
 - Ligera: 100 ms de RTT objetivo, 2% de pérdida y jitter de 20 ms.
@@ -54,7 +54,7 @@ Antes de medir con personas, usar bots o instancias controladas para comprobar c
 
 ### 3.3 Pruebas con dos personas reales
 
-Las pruebas de conexión se realizan con dos personas en dos PCs o dos instancias reales del build contra Photon Cloud. Cada participante crea o busca una sala desde su propia interfaz y comparte el nombre de sala con el otro jugador.
+Las pruebas de conexión se realizaron con dos personas en dos PCs o dos instancias reales del build contra Photon Cloud. Cada participante crea o busca una sala desde su propia interfaz y comparte el nombre de sala con el otro jugador.
 
 La persona anfitriona registra los datos del lobby y la partida; la segunda persona registra la percepción de movimiento, mensajes y resultados. Las mediciones de RTT se leen en el overlay F3 de ambos builds; no se reemplazan por valores generados por automatización.
 
@@ -73,8 +73,8 @@ Ninguna medición realizada por una persona sola o por bots reemplaza esta prueb
 Los perfiles principales son distintos de la prueba previa:
 
 - Normal humano: red doméstica real de las dos PCs, sin Network Conditions.
-- Adverso humano: activar 150 ms de delay, 50 ms de jitter y 5% de pérdida, solo si las dos PCs están aisladas de la prueba normal y cada participante reinicia el build.
-- Registrar al menos 3 rondas humanas por perfil y no mezclar resultados bot/persona.
+- Adverso humano: Se activan 150 ms de delay, 50 ms de jitter y 5% de pérdida, solo si las dos PCs están aisladas de la prueba normal y cada participante reinicia el build.
+- Se registran al menos 3 rondas humanas por perfil y no se mezclan resultados bot/persona.
 
 ## 4. Simulación de red
 
@@ -118,7 +118,7 @@ Tráfico por escenario (promedio de toda la corrida, incluido el lobby):
 
 El que más recibe es el cliente que no es master en la lluvia de bananas, porque el master spawnea cada banana. El pico medido es 4,3 KB/s. Todo se midió con 2 jugadores; con 4 se espera que el tráfico entrante crezca con la cantidad de jugadores remotos, pero no se midió.
 
-Comprobaciones funcionales de las mismas corridas, todas correctas: lobby y listos consistentes, premios de Copa (+4 al ganador, +3 al segundo), ganador y puntaje iguales en ambos clientes, vuelta al lobby con el jugador reseteado, y los efectos de un jugador (popups de puntos y OUT) visibles en el otro cliente.
+Comprobaciones funcionales de las mismas corridas, son todas correctas: lobby y listos consistentes, premios de Copa (+4 al ganador, +3 al segundo), ganador y puntaje iguales en ambos clientes, vuelta al lobby con el jugador reseteado, y los efectos de un jugador (popups de puntos y OUT) visibles en el otro cliente.
 
 ## 6. Resultados en condiciones desfavorables
 
