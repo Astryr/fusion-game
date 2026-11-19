@@ -7,6 +7,7 @@ public enum MiniGameId
     MemoryPuzzle = 4,
     TreeChop = 5,
     PrimateScreams = 6,
+    JungleClimber = 7,
 }
 
 public static class MiniGameNames
@@ -25,6 +26,7 @@ public static class MiniGameNames
         "Memotest de la jungla",
         "Rompe el arbol",
         "Gritos de primate",
+        "Escalador Selvatico",
     };
 
     public static readonly string[] ShortHints =
@@ -36,6 +38,7 @@ public static class MiniGameNames
         "Cada uno tiene su tablero. 9 pares. 7s para mirar. El primero en completar gana.",
         "Apreta la tecla que aparece. Las rojas son trampa. Primero a 30 gana.",
         "Escucha la selva. Grita con ESPACIO solo cuando anuncie al animal correcto. Primero a 5 gana.",
+        "Escala plataformas infinitas. Esquiva cocos y bananas explosivas antes de salir de pantalla.",
     };
 
     public static string Display(MiniGameId id)
@@ -58,6 +61,8 @@ public static class MiniGameNames
                 return $"Apreta la tecla que aparece. Las rojas son trampa. Primero a {rules.TreeChopTarget} gana.";
             case MiniGameId.PrimateScreams:
                 return "Escucha la selva. Grita con ESPACIO solo cuando anuncie al animal correcto. Primero a 5 gana.";
+            case MiniGameId.JungleClimber:
+                return "Escala plataformas infinitas. Esquiva cocos y bananas explosivas antes de salir de pantalla.";
         }
 
         int index = (int)id;
@@ -66,7 +71,7 @@ public static class MiniGameNames
 
     public static MiniGameId Clamp(int raw)
     {
-        if (raw < 0 || raw > (int)MiniGameId.PrimateScreams)
+        if (raw < 0 || raw > (int)MiniGameId.JungleClimber)
         {
             return MiniGameId.BananaRain;
         }
@@ -89,4 +94,5 @@ public enum PlayerControlMode
     Platformer = 1,
     ChestBeat = 2,
     PrimateScreams = 3,
+    JungleClimber = 4,
 }

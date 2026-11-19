@@ -3,7 +3,7 @@ using Fusion;
 
 public struct MatchConfig : INetworkStruct
 {
-    public const int AllMinigamesMask = (1 << 7) - 1;
+    public const int AllMinigamesMask = (1 << 8) - 1;
 
     public NetworkBool Valid;
     public int Revision;

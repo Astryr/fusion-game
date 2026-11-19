@@ -36,6 +36,16 @@ public class BananaGameManager : NetworkBehaviour
     [Networked] public float PrimateResultUntil { get; set; }
     [Networked] public NetworkBool PrimateCountdownActive { get; set; }
     [Networked] public NetworkString<_32> PrimatePointWinner { get; set; }
+    [Networked] public float ClimberCameraY { get; set; }
+    [Networked] public float ClimberTopPlatformY { get; set; }
+    [Networked] public NetworkBool ClimberHazardActive { get; set; }
+    [Networked] public int ClimberHazardType { get; set; }
+    [Networked] public float ClimberHazardX { get; set; }
+    [Networked] public float ClimberHazardY { get; set; }
+    [Networked] public float ClimberHazardSpeedX { get; set; }
+    [Networked] public float ClimberHazardFallSpeed { get; set; }
+    [Networked] public float ClimberHazardStartTime { get; set; }
+    [Networked] public int ClimberHazardSequence { get; set; }
     [Networked] public int RoundSeed { get; set; }
     [Networked] public int WinnerScore { get; set; }
     [Networked] public NetworkString<_32> WinnerName { get; set; }
@@ -789,6 +799,7 @@ public class BananaGameManager : NetworkBehaviour
         _minigames.Add(GetOrAdd<MemoryPuzzleMinigame>());
         _minigames.Add(GetOrAdd<TreeChopMinigame>());
         _minigames.Add(GetOrAdd<PrimateScreamsMinigame>());
+        _minigames.Add(GetOrAdd<JungleClimberMinigame>());
 
         foreach (var minigame in _minigames)
         {

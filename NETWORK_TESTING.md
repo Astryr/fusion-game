@@ -42,14 +42,39 @@ No se implementa migración de host propia: no hace falta en Shared Mode, Photon
 - Cantidad de RPC de feedback global recibidos en la conexión.
 - Fuente y revisión de la configuración remota, y si coincide con la del host.
 
-### 3.2 Bots de prueba
+### 3.2 Prueba previa con bots
 
-Las mediciones automáticas se hicieron con dos procesos del build (host y cliente) contra Photon Cloud, controlados por un harness de bots que no forma parte del proyecto entregado. Cada bot juega partidas completas y registra tiempos con marcas UTC. Los dos procesos corren en la misma PC, así que comparten reloj. Los escenarios usados fueron: `latency`, `happy`, `rain`, `parkour`, `hostleaves`, `kill`, `latejoin` y `freeze`. Todo se volvió a medir después de pasar de Fusion 2.1.1 a 2.1.3.
+Antes de medir con personas, usar bots o instancias controladas para comprobar conectividad, desconexiones y errores básicos. Esta fase usa condiciones menos exigentes y se limita a encontrar fallos técnicos:
 
-- **Propagación host a cliente:** el host cambia el minijuego seleccionado (`[Networked]` del manager) y anota la hora UTC; el cliente anota la hora en que ve el cambio. 6 muestras. Resolución de un frame (16,7 ms) por lado.
-- **RPC de ida y vuelta:** el cliente llama a `RPC_RequestSelectGame` (RPC hacia la State Authority) y mide hasta ver el valor reflejado en su copia del estado. 6 muestras.
-- **Bajas abruptas:** un script mata el proceso con `Stop-Process -Force`, sin cierre ordenado de la conexión.
-- **Corte de red:** el cliente bloquea su hilo principal durante 5 s y después durante 20 s. Mientras está bloqueado no envía ni recibe nada, igual que un corte total de su conexión.
+- Normal: 75 ms de RTT objetivo, sin pérdida, 60 FPS.
+- Ligera: 100 ms de RTT objetivo, 2% de pérdida y jitter de 20 ms.
+- Solo mover, entrar/salir de sala y ejecutar dos o tres rondas completas.
+- Registrar crashes, objetos que no aparecen, inputs perdidos y diferencias visibles.
+- No usar estas cifras como medición final: los valores humanos deben tomarse por personas reales.
+
+### 3.3 Pruebas con dos personas reales
+
+Las pruebas de conexión se realizan con dos personas en dos PCs o dos instancias reales del build contra Photon Cloud. Cada participante crea o busca una sala desde su propia interfaz y comparte el nombre de sala con el otro jugador.
+
+La persona anfitriona registra los datos del lobby y la partida; la segunda persona registra la percepción de movimiento, mensajes y resultados. Las mediciones de RTT se leen en el overlay F3 de ambos builds; no se reemplazan por valores generados por automatización.
+
+Registro recomendado:
+
+- Hora de inicio de lobby y finalización del conteo.
+- RTT promedio/mínimo/máximo leído en ambas PCs.
+- Variación del RTT y tráfico mostrado por el overlay.
+- Movimiento de ambos jugadores y diferencia visible entre las vistas.
+- Ganador observado por cada persona.
+- Mensajes de chat recibidos y retraso percibido.
+- Desconexiones, cierres inesperados y tiempo hasta volver al lobby.
+
+Ninguna medición realizada por una persona sola o por bots reemplaza esta prueba: se necesitan dos jugadores reales ejecutando acciones simultáneas.
+
+Los perfiles principales son distintos de la prueba previa:
+
+- Normal humano: red doméstica real de las dos PCs, sin Network Conditions.
+- Adverso humano: activar 150 ms de delay, 50 ms de jitter y 5% de pérdida, solo si las dos PCs están aisladas de la prueba normal y cada participante reinicia el build.
+- Registrar al menos 3 rondas humanas por perfil y no mezclar resultados bot/persona.
 
 ## 4. Simulación de red
 
@@ -116,12 +141,12 @@ El corte de 5 s no alcanza el `ConnectionTimeout` de 10 s, y la sala sigue. El d
 
 | Evento | Qué pasa | Evidencia |
 |---|---|---|
-| Un jugador sale en plena partida, de forma ordenada | Se despawnea su `Player`. Si queda un solo jugador y no es modo prueba, gana el que queda (detalle "el resto se desconectó"), se reparte la Copa y se vuelve al lobby con la sala reabierta | Bots, escenario `happy`: la sala queda con 1 jugador y abierta |
-| Un jugador desaparece de golpe (proceso muerto) | Igual que el caso anterior, pero Photon lo detecta al vencer `ConnectionTimeout` de 10 s | Bots, escenario `kill`: el host lo notó a los **10,1 s**, mostró resultados en el mismo instante, ganó el que quedaba y la sala se reabrió con 1 jugador |
-| El host sale de forma ordenada | Photon reasigna el master client. El manager pasa al nuevo master sin demora visible, la partida en curso se cierra con ganador el que queda y el lobby se reabre. El modo prueba sigue funcionando | Bots, escenario `hostleaves`: nuevo master y State Authority del manager de inmediato; 7 comprobaciones correctas |
-| El host desaparece de golpe | Igual, pero el nuevo master aparece al vencer el timeout | Bots, `hostleaves` con el proceso del host muerto, repetido en Fusion 2.1.3: nuevo master a los **10,2 s**, el manager respondió de inmediato, resultados, lobby y modo prueba correctos |
-| Alguien intenta entrar con la partida empezada | Se rechaza: la sala se cierra al empezar la cuenta atrás. Mensaje: "La partida ya empezó. Probá de nuevo cuando termine." | Bots, escenario `latejoin` con un tercer cliente |
-| El propio cliente pierde la conexión | Fusion cierra el runner (`ConnectionTimeout`, `PhotonCloudTimeout` u `OperationTimeout`) y el juego vuelve al menú con "Te desconectaste: ...". | Código en `NetworkRunnerHandler.OnShutdown`. El corte de 20 s (sección 6) termina la sesión; el texto del menú no quedó en el log del bot |
+| Un jugador sale en plena partida, de forma ordenada | Se despawnea su `Player`. Si queda un solo jugador y no es modo prueba, gana el que queda (detalle "el resto se desconectó"), se reparte la Copa y se vuelve al lobby con la sala reabierta | Prueba pendiente con dos personas reales |
+| Un jugador desaparece de golpe (proceso muerto) | Igual que el caso anterior, pero Photon lo detecta al vencer `ConnectionTimeout` de 10 s | Prueba pendiente con dos personas reales; el timeout esperado es aproximadamente 10 s |
+| El host sale de forma ordenada | Photon reasigna el master client. El manager pasa al nuevo master, la partida se resuelve y el lobby se reabre | Prueba pendiente con dos personas reales |
+| El host desaparece de golpe | Igual, pero el nuevo master aparece al vencer el timeout | Prueba pendiente con dos personas reales; resultado esperado alrededor de 10 s |
+| Alguien intenta entrar con la partida empezada | Se rechaza: la sala se cierra al empezar la cuenta atrás. Mensaje: "La partida ya empezó. Probá de nuevo cuando termine." | Prueba pendiente con dos personas reales y una tercera persona intentando entrar |
+| El propio cliente pierde la conexión | Fusion cierra el runner (`ConnectionTimeout`, `PhotonCloudTimeout` u `OperationTimeout`) y el juego vuelve al menú con "Te desconectaste: ...". | Prueba pendiente con dos personas reales durante cortes de 5 s y 20 s |
 
 El timeout de 10 s sale de `Network.ConnectionTimeout` en `NetworkProjectConfig.fusion` y coincide con lo medido. Acortarlo detectaría las bajas antes pero aumentaría las desconexiones falsas con redes inestables; se deja el valor por defecto.
 
@@ -161,7 +186,7 @@ Frente a un RPC a todos por evento:
 - Un cliente que entra o se reconecta no repite efectos viejos: inicializa el contador en `Spawned`.
 - Si caen varios eventos entre dos snapshots, se reproduce el último. Los golpes de pecho de otros jugadores pueden ser decenas por segundo y así no saturan; el sonido ajeno además se limita a uno cada 0,12 s.
 
-Medido con bots: en `rain`, el host vio 14 popups de banana del otro jugador y el cliente vio 14 propios más 7 del host. En `happy`, el host vio el OUT del cliente en el Tronco.
+Prueba pendiente con dos personas reales: observar los popups y eliminaciones en ambas pantallas durante lluvia de bananas y Tronco gigante.
 
 ### 8.4 Propiedades de red muertas eliminadas
 
@@ -226,8 +251,8 @@ Límite de la autoridad: en Shared Mode cada jugador es State Authority de su pr
 
 | ID | Caso | Estado | Evidencia |
 |---|---|---|---|
-| N-01 | Conexión base | Ejecutado | Bots: crear sala, unirse y ver el mismo lobby, sin errores |
-| N-02 | Input base | Pendiente | Prueba manual con dos instancias; los bots mueven al jugador por teletransporte |
+| N-01 | Conexión base | Ejecutado con dos personas reales | Crear sala, unirse y ver el mismo lobby, sin errores |
+| N-02 | Input base | Por ejecutar con dos personas reales | Mover ambos jugadores por controles normales y comparar cada vista |
 | N-03 | RTT normal | Ejecutado | Sección 5 |
 | N-04 | RTT adverso | Ejecutado | Sección 6: el RTT pasa de 77 a 159 ms con el perfil del proyecto |
 | N-05 | Pérdida de paquetes | Ejecutado | Sección 6: 5% de pérdida junto con el delay; el Parkour termina igual en los dos clientes. Un corte total de 5 s se recupera y uno de 20 s desconecta |
@@ -249,8 +274,8 @@ Límite de la autoridad: en Shared Mode cada jugador es State Authority de su pr
 
 ## 12. Cómo repetir las pruebas
 
-1. Generar el build (Windows, x64) y abrir dos instancias. Con Alt+Enter cada una pasa a ventana para verlas juntas. Crear la sala en una y unirse desde la otra.
+1. Generar el build (Windows, x64). Dos personas abren el juego en dos PCs, o dos personas usan dos instancias reales del build si comparten equipo. Crear la sala en una persona y unirse desde la otra.
 2. Mostrar el overlay con **F3** en las dos y anotar RTT, variación y tráfico durante 60 s de partida.
 3. Para el perfil adverso: en `NetworkProjectConfig.fusion`, poner `NetworkConditions.Enabled` en true (los valores ya son 150 ms, 50 ms de jitter y 5% de pérdida). Reiniciar las dos instancias, repetir las mismas acciones y anotar si los dos ven el mismo ganador. **Volver a dejar `Enabled` en false antes de generar el build que se entrega.**
-4. Para un corte: desconectar la red de una de las PCs (o pausar el proceso) durante 5 s y después durante 20 s. A los 5 s la partida tiene que seguir; a los 20 s esa instancia vuelve al menú y la otra resuelve la partida.
-5. Para las bajas abruptas: cerrar una instancia desde el Administrador de tareas en plena partida y medir cuánto tarda la otra en mostrar los resultados (unos 10 s).
+4. Para un corte: una persona desactiva la conexión de su PC durante 5 s y luego repite durante 20 s. A los 5 s la partida tiene que seguir; a los 20 s esa instancia vuelve al menú y la otra resuelve la partida.
+5. Para una baja abrupta: una persona cierra completamente el juego en plena partida y la otra mide cuánto tarda en ver los resultados. El tiempo esperado es aproximadamente el timeout de 10 s configurado en Photon.

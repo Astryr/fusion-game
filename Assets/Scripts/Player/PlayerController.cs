@@ -225,7 +225,7 @@ public class PlayerController : NetworkBehaviour
             return;
         }
 
-        if (ControlMode != PlayerControlMode.Platformer || IsEliminated)
+        if (ControlMode != PlayerControlMode.Platformer && ControlMode != PlayerControlMode.JungleClimber || IsEliminated)
         {
             NetHorizontal = 0f;
             return;

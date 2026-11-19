@@ -40,6 +40,8 @@ pantalla de victoria → volver al lobby.
     golpes buenos o, a los 60s, el que mas tenga.
   - **Gritos de primate**: escucha animales de la selva y grita con ESPACIO solo
     cuando suene el animal indicado. El primero en sumar 5 puntos gana.
+  - **Escalador Selvatico**: escalá plataformas infinitas mientras la cámara sube.
+    Evitá cocos, bananas explosivas y salir por debajo de la pantalla.
 - Al terminar se ven puestos y puntos de Copa (4-3-2-1). Desde ahi se
   vuelve al lobby para otra ronda.
 - El menu tiene un boton **RANKING** con el top 10 global de puntos de
